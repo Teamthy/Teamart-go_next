@@ -154,6 +154,16 @@ func getDuration(key string, defaultValue time.Duration) time.Duration {
 	if value == "" {
 		return defaultValue
 	}
+
+	// Handle days (e.g., "7d", "1d")
+	if len(value) > 1 && value[len(value)-1] == 'd' {
+		days, err := strconv.Atoi(value[:len(value)-1])
+		if err != nil {
+			panic(fmt.Sprintf("invalid duration value for %s: %s", key, value))
+		}
+		return time.Duration(days) * 24 * time.Hour
+	}
+
 	duration, err := time.ParseDuration(value)
 	if err != nil {
 		panic(fmt.Sprintf("invalid duration value for %s: %s", key, value))
