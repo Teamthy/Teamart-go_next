@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -8,6 +9,8 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/teamart/commerce-api/config"
+	"github.com/teamart/commerce-api/internal/infra/database"
+	"github.com/teamart/commerce-api/internal/infra/migrations"
 	"github.com/teamart/commerce-api/pkg/app"
 	"github.com/teamart/commerce-api/pkg/logger"
 )
@@ -37,8 +40,51 @@ func main() {
 	// Create application instance
 	application := app.New(cfg, log)
 
+	// Initialize database connection pool (Step 1: PostgreSQL Connection Layer)
+	// This demonstrates explicit infrastructure ownership
+	db, err := database.NewPool(context.Background(), &cfg.Database, log)
+	if err != nil {
+		log.Errorf("failed to initialize database: %v", err)
+		os.Exit(1)
+	}
+
+	// Register database cleanup on application shutdown
+	// This ensures explicit resource management - we own the lifecycle
+	application.RegisterCleanup(func(shutdownCtx context.Context) error {
+		log.Info("closing database connection pool...")
+		db.Close()
+		log.Info("database connection pool closed")
+		return nil
+	})
+
+	// Check database health on startup
+	health, err := db.Health(context.Background())
+	if err != nil {
+		log.Warnf("database health check failed: %v", err)
+	} else {
+		log.Infof("database health: %s (response_time=%dms)", health.Status, health.ResponseTime)
+	}
+
+	// Run database migrations (Step 2: Migration System)
+	// This is explicit schema evolution - we own the process
+	log.Infof("running database migrations...")
+	runner := migrations.NewRunner(db, log, migrations.Migrations)
+	if err := runner.Migrate(context.Background()); err != nil {
+		log.Errorf("migration failed: %v", err)
+		os.Exit(1)
+	}
+
+	// Check migration status
+	status, err := runner.Status(context.Background())
+	if err != nil {
+		log.Warnf("failed to get migration status: %v", err)
+	} else {
+		log.Infof("migrations status: %d applied, %d pending",
+			len(status.AppliedMigrations), status.PendingMigrations)
+	}
+
 	// Create router (placeholder for now)
-	router := createRouter(log)
+	router := createRouter(log, db, runner)
 
 	// Run application
 	if err := application.Run(router); err != nil {
@@ -48,7 +94,7 @@ func main() {
 }
 
 // createRouter creates and configures the HTTP router
-func createRouter(log *logger.Logger) http.Handler {
+func createRouter(log *logger.Logger, db *database.Pool, migrationRunner migrations.MigrationRunner) http.Handler {
 	mux := http.NewServeMux()
 
 	// Health check endpoint
@@ -62,8 +108,18 @@ func createRouter(log *logger.Logger) http.Handler {
 	// Ready check endpoint
 	mux.HandleFunc("GET /ready", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+
+		// Check database readiness
+		dbHealth, err := db.Health(r.Context())
+		if err != nil || dbHealth.Status != "healthy" {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			fmt.Fprintf(w, `{"status":"not_ready","database":"unavailable"}`)
+			log.Warnf("readiness check failed: database unhealthy")
+			return
+		}
+
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, `{"status":"ready"}`)
+		fmt.Fprintf(w, `{"status":"ready","database":"healthy"}`)
 		log.Debug("readiness check")
 	})
 
@@ -73,6 +129,58 @@ func createRouter(log *logger.Logger) http.Handler {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, `{"version":"v1","service":"teamart-commerce-api"}`)
 		log.Debug("api version endpoint")
+	})
+
+	// Database diagnostics endpoint (development only)
+	mux.HandleFunc("GET /api/v1/diagnostics/db", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		stats := db.Stats()
+		health, err := db.Health(r.Context())
+		if err != nil {
+			health = &database.HealthStatus{
+				Status: "error",
+				Error:  err.Error(),
+			}
+		}
+
+		fmt.Fprintf(w, `{
+			"status":"%s",
+			"response_time_ms":%d,
+			"pool_stats":{
+				"acquired_conns":%d,
+				"idle_conns":%d,
+				"total_conns":%d,
+				"constructing_conns":%d
+			}
+		}`, health.Status, health.ResponseTime, stats.AcquiredConns, stats.IdleConns, stats.TotalConns, stats.ConstructingConns)
+		log.Debug("database diagnostics")
+	})
+
+	// Migration status endpoint
+	mux.HandleFunc("GET /api/v1/diagnostics/migrations", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		status, err := migrationRunner.Status(r.Context())
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"error":"failed to get migration status"}`)
+			log.Errorf("failed to get migration status: %v", err)
+			return
+		}
+
+		currentVersion := "none"
+		if status.CurrentVersion != "" {
+			currentVersion = status.CurrentVersion
+		}
+
+		fmt.Fprintf(w, `{
+			"current_version":"%s",
+			"applied":%d,
+			"pending":%d,
+			"total":%d
+		}`, currentVersion, len(status.AppliedMigrations), status.PendingMigrations, status.TotalMigrations)
+		log.Debug("migration status")
 	})
 
 	return mux
