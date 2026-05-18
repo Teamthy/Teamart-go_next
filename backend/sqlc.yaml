@@ -1,0 +1,18 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    queries: "./internal/infra/queries"
+    schema: "./internal/infra/migrations"
+    gen:
+      go:
+        out: "./internal/infra/queries"
+        package: "queries"
+        sql_package: "pgx"
+        emit_json_tags: true
+        emit_db_tags: true
+        emit_prepared_queries: false
+        emit_exact_table_names: false
+        emit_empty_slices: true
+        emit_all_enums: true
+        emit_enum_valid_method: true
+        emit_pointers_for_null_types: true
