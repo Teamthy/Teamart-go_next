@@ -9,8 +9,10 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/teamart/commerce-api/config"
+	"github.com/teamart/commerce-api/internal/handlers"
 	"github.com/teamart/commerce-api/internal/infra/database"
 	"github.com/teamart/commerce-api/internal/infra/migrations"
+	"github.com/teamart/commerce-api/internal/infra/queries"
 	"github.com/teamart/commerce-api/pkg/app"
 	"github.com/teamart/commerce-api/pkg/logger"
 )
@@ -83,8 +85,13 @@ func main() {
 			len(status.AppliedMigrations), status.PendingMigrations)
 	}
 
-	// Create router (placeholder for now)
-	router := createRouter(log, db, runner)
+	// Initialize SQLC queries (Step 3: Type-Safe SQL Generation)
+	// This provides compile-time safe access to the database
+	log.Infof("initializing SQLC queries")
+	q := queries.New(db)
+
+	// Create router with all handlers
+	router := createRouter(log, db, runner, q)
 
 	// Run application
 	if err := application.Run(router); err != nil {
@@ -92,10 +99,18 @@ func main() {
 		os.Exit(1)
 	}
 }
+}
 
 // createRouter creates and configures the HTTP router
-func createRouter(log *logger.Logger, db *database.Pool, migrationRunner migrations.MigrationRunner) http.Handler {
+func createRouter(log *logger.Logger, db *database.Pool, migrationRunner migrations.MigrationRunner, q *queries.Queries) http.Handler {
 	mux := http.NewServeMux()
+
+	// Register health check endpoints
+	handlers.RegisterHealthRoutes(mux)
+
+	// Register all API handlers (users, products, orders)
+	// This initializes service layers and sets up all routes
+	handlers.SetupHandlers(mux, q, log)
 
 	// Health check endpoint
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
@@ -182,6 +197,8 @@ func createRouter(log *logger.Logger, db *database.Pool, migrationRunner migrati
 		}`, currentVersion, len(status.AppliedMigrations), status.PendingMigrations, status.TotalMigrations)
 		log.Debug("migration status")
 	})
+
+	log.Infof("HTTP router configured with all endpoints")
 
 	return mux
 }
