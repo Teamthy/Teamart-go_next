@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 
 	"github.com/teamart/commerce-api/config"
+	"github.com/teamart/commerce-api/internal/auth"
 	"github.com/teamart/commerce-api/internal/handlers"
 	"github.com/teamart/commerce-api/internal/infra/database"
 	"github.com/teamart/commerce-api/internal/infra/migrations"
@@ -90,8 +92,11 @@ func main() {
 	log.Infof("initializing SQLC queries")
 	q := queries.New(db)
 
+	// Create auth configuration
+	authConfig := createAuthConfig()
+
 	// Create router with all handlers
-	router := createRouter(log, db, runner, q)
+	router := createRouter(log, db, runner, q, authConfig)
 
 	// Run application
 	if err := application.Run(router); err != nil {
@@ -102,15 +107,21 @@ func main() {
 }
 
 // createRouter creates and configures the HTTP router
-func createRouter(log *logger.Logger, db *database.Pool, migrationRunner migrations.MigrationRunner, q *queries.Queries) http.Handler {
+func createRouter(
+	log *logger.Logger,
+	db *database.Pool,
+	migrationRunner migrations.MigrationRunner,
+	q *queries.Queries,
+	authConfig *auth.AuthConfig,
+) http.Handler {
 	mux := http.NewServeMux()
 
 	// Register health check endpoints
 	handlers.RegisterHealthRoutes(mux)
 
-	// Register all API handlers (users, products, orders)
+	// Register all API handlers (auth, users, products, orders)
 	// This initializes service layers and sets up all routes
-	handlers.SetupHandlers(mux, q, log)
+	handlers.SetupHandlers(mux, q, db, authConfig, log)
 
 	// Health check endpoint
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
@@ -201,4 +212,48 @@ func createRouter(log *logger.Logger, db *database.Pool, migrationRunner migrati
 	log.Infof("HTTP router configured with all endpoints")
 
 	return mux
+}
+
+// createAuthConfig creates the authentication configuration with sensible defaults
+func createAuthConfig() *auth.AuthConfig {
+	return &auth.AuthConfig{
+		// JWT Configuration (from environment or defaults)
+		JWTSecret:           os.Getenv("JWT_SECRET"),
+		JWTAccessTokenTTL:   getDurationFromEnv("JWT_ACCESS_TOKEN_TTL", 15*time.Minute),
+		JWTRefreshTokenTTL:  getDurationFromEnv("JWT_REFRESH_TOKEN_TTL", 7*24*time.Hour),
+		JWTEmailTokenTTL:    getDurationFromEnv("JWT_EMAIL_TOKEN_TTL", 24*time.Hour),
+		JWTPasswordResetTTL: getDurationFromEnv("JWT_PASSWORD_RESET_TTL", 1*time.Hour),
+
+		// OTP Configuration
+		OTPLength:      6,
+		OTPTTL:         getDurationFromEnv("OTP_TTL", 5*time.Minute),
+		OTPMaxAttempts: 3,
+
+		// Session Configuration
+		SessionTTL:         getDurationFromEnv("SESSION_TTL", 24*time.Hour),
+		SessionIdleTimeout: getDurationFromEnv("SESSION_IDLE_TIMEOUT", 30*time.Minute),
+
+		// Security Configuration
+		MaxLoginAttempts:       5,
+		LoginAttemptWindow:     getDurationFromEnv("LOGIN_ATTEMPT_WINDOW", 15*time.Minute),
+		PasswordMinLength:      8,
+		PasswordRequireSpecial: true,
+		PasswordRequireNumbers: true,
+
+		// Device Trust
+		RequireDeviceVerification: false,
+	}
+}
+
+// getDurationFromEnv gets a duration from environment variable or returns default
+func getDurationFromEnv(key string, defaultValue time.Duration) time.Duration {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+	d, err := time.ParseDuration(value)
+	if err != nil {
+		return defaultValue
+	}
+	return d
 }
