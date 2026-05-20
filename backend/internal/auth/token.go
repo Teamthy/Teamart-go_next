@@ -26,11 +26,11 @@ func NewTokenService(config *AuthConfig, logger *logger.Logger) *TokenService {
 
 // GenerateTokenPairInput represents input for token pair generation
 type GenerateTokenPairInput struct {
-	UserID       int64
-	Email        string
-	SessionID    string
-	DeviceID     string
-	Permissions  []string
+	UserID      int64
+	Email       string
+	SessionID   string
+	DeviceID    string
+	Permissions []string
 }
 
 // GenerateTokenPair generates an access token and refresh token pair
@@ -82,17 +82,21 @@ func (ts *TokenService) generateAccessToken(input *GenerateTokenPairInput) (stri
 	expiresAt := now.Add(ts.config.JWTAccessTokenTTL)
 	jti := ts.generateJTI()
 
-	claims := JWTClaims{
-		UserID:      input.UserID,
-		Email:       input.Email,
-		TokenType:   TokenTypeAccess,
-		SessionID:   input.SessionID,
-		DeviceID:    input.DeviceID,
-		Permissions: input.Permissions,
-		IssuedAt:    now,
-		ExpiresAt:   expiresAt,
-		NotBefore:   now,
-		JRTI:        jti,
+	claims := &CustomClaims{
+		JWTClaims: JWTClaims{
+			UserID:      input.UserID,
+			Email:       input.Email,
+			TokenType:   TokenTypeAccess,
+			SessionID:   input.SessionID,
+			DeviceID:    input.DeviceID,
+			Permissions: input.Permissions,
+		},
+		RegisteredClaims: jwt.RegisteredClaims{
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(expiresAt),
+			NotBefore: jwt.NewNumericDate(now),
+			ID:        jti,
+		},
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -111,16 +115,20 @@ func (ts *TokenService) generateRefreshToken(input *GenerateTokenPairInput) (str
 	expiresAt := now.Add(ts.config.JWTRefreshTokenTTL)
 	jti := ts.generateJTI()
 
-	claims := JWTClaims{
-		UserID:    input.UserID,
-		Email:     input.Email,
-		TokenType: TokenTypeRefresh,
-		SessionID: input.SessionID,
-		DeviceID:  input.DeviceID,
-		IssuedAt:  now,
-		ExpiresAt: expiresAt,
-		NotBefore: now,
-		JRTI:      jti,
+	claims := &CustomClaims{
+		JWTClaims: JWTClaims{
+			UserID:    input.UserID,
+			Email:     input.Email,
+			TokenType: TokenTypeRefresh,
+			SessionID: input.SessionID,
+			DeviceID:  input.DeviceID,
+		},
+		RegisteredClaims: jwt.RegisteredClaims{
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(expiresAt),
+			NotBefore: jwt.NewNumericDate(now),
+			ID:        jti,
+		},
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -135,15 +143,15 @@ func (ts *TokenService) generateRefreshToken(input *GenerateTokenPairInput) (str
 
 // ValidateTokenInput represents input for token validation
 type ValidateTokenInput struct {
-	Token        string
-	TokenType    TokenType
-	ExpectJTI    string // Optional: for refresh rotation verification
+	Token     string
+	TokenType TokenType
+	ExpectJTI string // Optional: for refresh rotation verification
 }
 
 // ValidateTokenOutput represents the result of token validation
 type ValidateTokenOutput struct {
 	IsValid bool
-	Claims  *JWTClaims
+	Claims  *CustomClaims
 	Error   error
 }
 
@@ -153,8 +161,8 @@ func (ts *TokenService) ValidateToken(ctx context.Context, input *ValidateTokenI
 		return nil, fmt.Errorf("token is required")
 	}
 
-	claims := &JWTClaims{}
-	
+	claims := &CustomClaims{}
+
 	token, err := jwt.ParseWithClaims(input.Token, claims, func(token *jwt.Token) (interface{}, error) {
 		return []byte(ts.config.JWTSecret), nil
 	})
@@ -185,8 +193,8 @@ func (ts *TokenService) ValidateToken(ctx context.Context, input *ValidateTokenI
 	}
 
 	// Verify JTI if provided (for refresh rotation)
-	if input.ExpectJTI != "" && claims.JRTI != input.ExpectJTI {
-		ts.logger.Debugf("token JTI mismatch: expected %s, got %s", input.ExpectJTI, claims.JRTI)
+	if input.ExpectJTI != "" && claims.RegisteredClaims.ID != input.ExpectJTI {
+		ts.logger.Debugf("token JTI mismatch: expected %s, got %s", input.ExpectJTI, claims.RegisteredClaims.ID)
 		return &ValidateTokenOutput{
 			IsValid: false,
 			Error:   ErrInvalidToken,
@@ -210,9 +218,9 @@ type RefreshTokenInput struct {
 
 // RefreshTokenOutput represents the result of token refresh
 type RefreshTokenOutput struct {
-	NewAccessToken string
+	NewAccessToken  string
 	NewRefreshToken string // Token rotation: new refresh token
-	ExpiresIn      int64
+	ExpiresIn       int64
 	OldRefreshToken string // For revocation
 }
 
@@ -241,7 +249,7 @@ func (ts *TokenService) RefreshToken(ctx context.Context, input *RefreshTokenInp
 		return nil, result.Error
 	}
 
-	oldJTI := result.Claims.JRTI
+	oldJTI := result.Claims.RegisteredClaims.ID
 
 	// Generate new token pair with rotation
 	tokenInput := &GenerateTokenPairInput{
@@ -283,7 +291,7 @@ func (ts *TokenService) RevokeToken(ctx context.Context, input *RevokeTokenInput
 		return fmt.Errorf("JTI is required")
 	}
 
-	ts.logger.Infof("revoking token JTI %s for user %d (reason: %s)", 
+	ts.logger.Infof("revoking token JTI %s for user %d (reason: %s)",
 		input.JTI, input.UserID, input.Reason)
 
 	// In a real implementation, this would add the JTI to a blacklist/revocation list
@@ -306,8 +314,11 @@ func (ts *TokenService) IsTokenExpired(expiresAt time.Time) bool {
 }
 
 // GetTokenExpiryTime returns when a token expires
-func (ts *TokenService) GetTokenExpiryTime(claims *JWTClaims) time.Time {
-	return claims.ExpiresAt
+func (ts *TokenService) GetTokenExpiryTime(claims *CustomClaims) time.Time {
+	if claims.RegisteredClaims.ExpiresAt == nil {
+		return time.Time{}
+	}
+	return claims.RegisteredClaims.ExpiresAt.Time
 }
 
 // GetTimeRemainingForToken returns remaining time for token

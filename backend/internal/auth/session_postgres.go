@@ -39,16 +39,16 @@ func (r *SessionRepositoryPostgres) CreateSession(ctx context.Context, session *
 	query := `
 		INSERT INTO sessions (
 			id, user_id, device_id, device_fingerprint, user_agent, ip_address,
-			trust_level, requires_mfa_step, requires_password_verification,
+			trust_level, requires_mfa,
 			geo_country, geo_city, geo_latitude, geo_longitude, geo_timezone,
-			mfa_verified_at, password_verified_at, revoked_at, revoke_reason,
+			mfa_verified_at, revoked_at, revoke_reason,
 			created_at, last_activity_at, expires_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6,
-			$7, $8, $9,
-			$10, $11, $12, $13, $14,
-			$15, $16, $17, $18,
-			$19, $20, $21
+			$7, $8,
+			$9, $10, $11, $12, $13,
+			$14, $15, $16,
+			$17, $18, $19
 		)
 	`
 
@@ -60,15 +60,13 @@ func (r *SessionRepositoryPostgres) CreateSession(ctx context.Context, session *
 		session.UserAgent,
 		session.IPAddress,
 		session.TrustLevel,
-		session.RequiresMFAStep,
-		session.RequiresPasswordVerification,
+		session.RequiresMFA,
 		session.GeoLocation.Country,
 		session.GeoLocation.City,
 		session.GeoLocation.Latitude,
 		session.GeoLocation.Longitude,
 		session.GeoLocation.Timezone,
 		session.MFAVerifiedAt,
-		session.PasswordVerifiedAt,
 		session.RevokedAt,
 		session.RevokeReason,
 		session.CreatedAt,
@@ -94,12 +92,12 @@ func (r *SessionRepositoryPostgres) GetSession(ctx context.Context, sessionID st
 	query := `
 		SELECT
 			id, user_id, device_id, device_fingerprint, user_agent, ip_address,
-			trust_level, requires_mfa_step, requires_password_verification,
+			trust_level, requires_mfa,
 			geo_country, geo_city, geo_latitude, geo_longitude, geo_timezone,
-			mfa_verified_at, password_verified_at, revoked_at, revoke_reason,
+			mfa_verified_at, revoked_at, revoke_reason,
 			created_at, last_activity_at, expires_at
 		FROM sessions
-		WHERE id = $1
+		WHERE id = $1 AND revoked_at IS NULL
 	`
 
 	session := &Session{
@@ -114,15 +112,13 @@ func (r *SessionRepositoryPostgres) GetSession(ctx context.Context, sessionID st
 		&session.UserAgent,
 		&session.IPAddress,
 		&session.TrustLevel,
-		&session.RequiresMFAStep,
-		&session.RequiresPasswordVerification,
+		&session.RequiresMFA,
 		&session.GeoLocation.Country,
 		&session.GeoLocation.City,
 		&session.GeoLocation.Latitude,
 		&session.GeoLocation.Longitude,
 		&session.GeoLocation.Timezone,
 		&session.MFAVerifiedAt,
-		&session.PasswordVerifiedAt,
 		&session.RevokedAt,
 		&session.RevokeReason,
 		&session.CreatedAt,
@@ -130,11 +126,11 @@ func (r *SessionRepositoryPostgres) GetSession(ctx context.Context, sessionID st
 		&session.ExpiresAt,
 	)
 
-	if err == pgx.ErrNoRows {
-		return nil, fmt.Errorf("session not found: %s", sessionID)
-	}
 	if err != nil {
-		r.logger.Errorf("failed to get session: %v", err)
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("session not found")
+		}
+		r.logger.Warnf("failed to get session: %v", err)
 		return nil, fmt.Errorf("failed to get session: %w", err)
 	}
 
@@ -150,27 +146,28 @@ func (r *SessionRepositoryPostgres) GetUserSessions(ctx context.Context, userID 
 	query := `
 		SELECT
 			id, user_id, device_id, device_fingerprint, user_agent, ip_address,
-			trust_level, requires_mfa_step, requires_password_verification,
+			trust_level, requires_mfa,
 			geo_country, geo_city, geo_latitude, geo_longitude, geo_timezone,
-			mfa_verified_at, password_verified_at, revoked_at, revoke_reason,
+			mfa_verified_at, revoked_at, revoke_reason,
 			created_at, last_activity_at, expires_at
 		FROM sessions
-		WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > $2
+		WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > NOW()
 		ORDER BY last_activity_at DESC
 	`
 
-	rows, err := r.db.Query(ctx, query, userID, time.Now())
+	rows, err := r.db.Query(ctx, query, userID)
 	if err != nil {
-		r.logger.Errorf("failed to get user sessions: %v", err)
+		r.logger.Warnf("failed to get user sessions: %v", err)
 		return nil, fmt.Errorf("failed to get user sessions: %w", err)
 	}
 	defer rows.Close()
 
-	var sessions []*Session
+	sessions := make([]*Session, 0)
 	for rows.Next() {
 		session := &Session{
 			GeoLocation: &GeoLocation{},
 		}
+
 		err := rows.Scan(
 			&session.ID,
 			&session.UserID,
@@ -179,31 +176,26 @@ func (r *SessionRepositoryPostgres) GetUserSessions(ctx context.Context, userID 
 			&session.UserAgent,
 			&session.IPAddress,
 			&session.TrustLevel,
-			&session.RequiresMFAStep,
-			&session.RequiresPasswordVerification,
+			&session.RequiresMFA,
 			&session.GeoLocation.Country,
 			&session.GeoLocation.City,
 			&session.GeoLocation.Latitude,
 			&session.GeoLocation.Longitude,
 			&session.GeoLocation.Timezone,
 			&session.MFAVerifiedAt,
-			&session.PasswordVerifiedAt,
 			&session.RevokedAt,
 			&session.RevokeReason,
 			&session.CreatedAt,
 			&session.LastActivityAt,
 			&session.ExpiresAt,
 		)
-		if err != nil {
-			r.logger.Errorf("failed to scan session row: %v", err)
-			return nil, fmt.Errorf("failed to scan session row: %w", err)
-		}
-		sessions = append(sessions, session)
-	}
 
-	if err = rows.Err(); err != nil {
-		r.logger.Errorf("error iterating sessions: %v", err)
-		return nil, fmt.Errorf("error iterating sessions: %w", err)
+		if err != nil {
+			r.logger.Warnf("failed to scan session: %v", err)
+			continue
+		}
+
+		sessions = append(sessions, session)
 	}
 
 	return sessions, nil
@@ -221,12 +213,12 @@ func (r *SessionRepositoryPostgres) GetUserSession(ctx context.Context, userID i
 	query := `
 		SELECT
 			id, user_id, device_id, device_fingerprint, user_agent, ip_address,
-			trust_level, requires_mfa_step, requires_password_verification,
+			trust_level, requires_mfa,
 			geo_country, geo_city, geo_latitude, geo_longitude, geo_timezone,
-			mfa_verified_at, password_verified_at, revoked_at, revoke_reason,
+			mfa_verified_at, revoked_at, revoke_reason,
 			created_at, last_activity_at, expires_at
 		FROM sessions
-		WHERE id = $1 AND user_id = $2
+		WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL
 	`
 
 	session := &Session{
@@ -241,15 +233,13 @@ func (r *SessionRepositoryPostgres) GetUserSession(ctx context.Context, userID i
 		&session.UserAgent,
 		&session.IPAddress,
 		&session.TrustLevel,
-		&session.RequiresMFAStep,
-		&session.RequiresPasswordVerification,
+		&session.RequiresMFA,
 		&session.GeoLocation.Country,
 		&session.GeoLocation.City,
 		&session.GeoLocation.Latitude,
 		&session.GeoLocation.Longitude,
 		&session.GeoLocation.Timezone,
 		&session.MFAVerifiedAt,
-		&session.PasswordVerifiedAt,
 		&session.RevokedAt,
 		&session.RevokeReason,
 		&session.CreatedAt,
@@ -257,12 +247,11 @@ func (r *SessionRepositoryPostgres) GetUserSession(ctx context.Context, userID i
 		&session.ExpiresAt,
 	)
 
-	if err == pgx.ErrNoRows {
-		return nil, fmt.Errorf("session not found for user %d: %s", userID, sessionID)
-	}
 	if err != nil {
-		r.logger.Errorf("failed to get user session: %v", err)
-		return nil, fmt.Errorf("failed to get user session: %w", err)
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("session not found")
+		}
+		return nil, fmt.Errorf("failed to get session: %w", err)
 	}
 
 	return session, nil
@@ -280,37 +269,18 @@ func (r *SessionRepositoryPostgres) UpdateSession(ctx context.Context, session *
 	query := `
 		UPDATE sessions SET
 			trust_level = $1,
-			requires_mfa_step = $2,
-			requires_password_verification = $3,
-			geo_country = $4,
-			geo_city = $5,
-			geo_latitude = $6,
-			geo_longitude = $7,
-			geo_timezone = $8,
-			mfa_verified_at = $9,
-			password_verified_at = $10,
-			revoked_at = $11,
-			revoke_reason = $12,
-			last_activity_at = $13,
-			expires_at = $14
-		WHERE id = $15
+			requires_mfa = $2,
+			mfa_verified_at = $3,
+			last_activity_at = $4,
+			updated_at = NOW()
+		WHERE id = $5 AND revoked_at IS NULL
 	`
 
-	tag, err := r.db.Exec(ctx, query,
+	result, err := r.db.Exec(ctx, query,
 		session.TrustLevel,
-		session.RequiresMFAStep,
-		session.RequiresPasswordVerification,
-		session.GeoLocation.Country,
-		session.GeoLocation.City,
-		session.GeoLocation.Latitude,
-		session.GeoLocation.Longitude,
-		session.GeoLocation.Timezone,
+		session.RequiresMFA,
 		session.MFAVerifiedAt,
-		session.PasswordVerifiedAt,
-		session.RevokedAt,
-		session.RevokeReason,
 		session.LastActivityAt,
-		session.ExpiresAt,
 		session.ID,
 	)
 
@@ -319,15 +289,14 @@ func (r *SessionRepositoryPostgres) UpdateSession(ctx context.Context, session *
 		return fmt.Errorf("failed to update session: %w", err)
 	}
 
-	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("session not found: %s", session.ID)
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("session not found")
 	}
 
-	r.logger.Debugf("updated session %s", session.ID)
 	return nil
 }
 
-// TouchSession updates the last activity timestamp
+// TouchSession updates the last activity time for a session
 func (r *SessionRepositoryPostgres) TouchSession(ctx context.Context, sessionID string) error {
 	if sessionID == "" {
 		return fmt.Errorf("session ID is required")
@@ -335,27 +304,25 @@ func (r *SessionRepositoryPostgres) TouchSession(ctx context.Context, sessionID 
 
 	query := `
 		UPDATE sessions SET
-			last_activity_at = $1
-		WHERE id = $2 AND revoked_at IS NULL
+			last_activity_at = NOW(),
+			updated_at = NOW()
+		WHERE id = $1 AND revoked_at IS NULL
 	`
 
-	now := time.Now()
-	tag, err := r.db.Exec(ctx, query, now, sessionID)
-
+	result, err := r.db.Exec(ctx, query, sessionID)
 	if err != nil {
 		r.logger.Errorf("failed to touch session: %v", err)
 		return fmt.Errorf("failed to touch session: %w", err)
 	}
 
-	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("session not found or revoked: %s", sessionID)
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("session not found")
 	}
 
-	r.logger.Debugf("touched session %s", sessionID)
 	return nil
 }
 
-// RevokeSession revokes a single session
+// RevokeSession revokes a session
 func (r *SessionRepositoryPostgres) RevokeSession(ctx context.Context, sessionID string, reason string) error {
 	if sessionID == "" {
 		return fmt.Errorf("session ID is required")
@@ -363,28 +330,28 @@ func (r *SessionRepositoryPostgres) RevokeSession(ctx context.Context, sessionID
 
 	query := `
 		UPDATE sessions SET
-			revoked_at = $1,
-			revoke_reason = $2
-		WHERE id = $3
+			revoked_at = NOW(),
+			revoke_reason = $1,
+			is_revoked = true,
+			updated_at = NOW()
+		WHERE id = $2
 	`
 
-	now := time.Now()
-	tag, err := r.db.Exec(ctx, query, now, reason, sessionID)
-
+	result, err := r.db.Exec(ctx, query, reason, sessionID)
 	if err != nil {
 		r.logger.Errorf("failed to revoke session: %v", err)
 		return fmt.Errorf("failed to revoke session: %w", err)
 	}
 
-	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("session not found: %s", sessionID)
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("session not found")
 	}
 
 	r.logger.Infof("revoked session %s: %s", sessionID, reason)
 	return nil
 }
 
-// RevokeUserSessions revokes all user sessions except the provided one
+// RevokeUserSessions revokes all sessions for a user
 func (r *SessionRepositoryPostgres) RevokeUserSessions(ctx context.Context, userID int64, exceptSessionID string, reason string) error {
 	if userID == 0 {
 		return fmt.Errorf("user ID is required")
@@ -392,65 +359,36 @@ func (r *SessionRepositoryPostgres) RevokeUserSessions(ctx context.Context, user
 
 	query := `
 		UPDATE sessions SET
-			revoked_at = $1,
-			revoke_reason = $2
-		WHERE user_id = $3 AND id != $4 AND revoked_at IS NULL
+			revoked_at = NOW(),
+			revoke_reason = $1,
+			is_revoked = true,
+			updated_at = NOW()
+		WHERE user_id = $2 AND id != $3 AND revoked_at IS NULL
 	`
 
-	now := time.Now()
-	tag, err := r.db.Exec(ctx, query, now, reason, userID, exceptSessionID)
-
+	result, err := r.db.Exec(ctx, query, reason, userID, exceptSessionID)
 	if err != nil {
 		r.logger.Errorf("failed to revoke user sessions: %v", err)
 		return fmt.Errorf("failed to revoke user sessions: %w", err)
 	}
 
-	r.logger.Warnf("revoked %d sessions for user %d except %s: %s",
-		tag.RowsAffected(), userID, exceptSessionID, reason)
+	r.logger.Infof("revoked %d sessions for user %d: %s", result.RowsAffected(), userID, reason)
 	return nil
 }
 
-// CleanupExpiredSessions removes expired sessions older than maxAge
-func (r *SessionRepositoryPostgres) CleanupExpiredSessions(ctx context.Context, maxAge time.Duration) error {
+// CleanupExpiredSessions removes expired and revoked sessions older than maxAge
+func (r *SessionRepositoryPostgres) CleanupExpiredSessions(ctx context.Context, maxAge time.Duration) (int64, error) {
 	query := `
 		DELETE FROM sessions
-		WHERE expires_at < $1 OR created_at < $2
+		WHERE (revoked_at IS NOT NULL AND revoked_at < NOW() - INTERVAL '1 second' * $1)
+		   OR (expires_at < NOW() AND created_at < NOW() - INTERVAL '1 second' * $1)
 	`
 
-	cutoff := time.Now().Add(-maxAge)
-	oldCutoff := time.Now().Add(-24 * time.Hour) // Also delete sessions older than 24h
-
-	tag, err := r.db.Exec(ctx, query, cutoff, oldCutoff)
-
+	result, err := r.db.Exec(ctx, query, int64(maxAge.Seconds()))
 	if err != nil {
 		r.logger.Errorf("failed to cleanup expired sessions: %v", err)
-		return fmt.Errorf("failed to cleanup expired sessions: %w", err)
+		return 0, fmt.Errorf("failed to cleanup expired sessions: %w", err)
 	}
 
-	r.logger.Infof("cleaned up %d expired sessions", tag.RowsAffected())
-	return nil
-}
-
-// SessionExists checks if a session exists and is valid
-func (r *SessionRepositoryPostgres) SessionExists(ctx context.Context, sessionID string) (bool, error) {
-	if sessionID == "" {
-		return false, fmt.Errorf("session ID is required")
-	}
-
-	query := `
-		SELECT 1 FROM sessions
-		WHERE id = $1 AND revoked_at IS NULL AND expires_at > $2
-		LIMIT 1
-	`
-
-	err := r.db.QueryRow(ctx, query, sessionID, time.Now()).Scan(nil)
-	if err == pgx.ErrNoRows {
-		return false, nil
-	}
-	if err != nil {
-		r.logger.Errorf("failed to check session existence: %v", err)
-		return false, fmt.Errorf("failed to check session existence: %w", err)
-	}
-
-	return true, nil
+	return result.RowsAffected(), nil
 }
