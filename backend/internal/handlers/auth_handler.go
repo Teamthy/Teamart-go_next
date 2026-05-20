@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/teamart/commerce-api/internal/auth"
 	"github.com/teamart/commerce-api/pkg/logger"
@@ -12,6 +13,8 @@ import (
 type AuthHandler struct {
 	identityService *auth.IdentityService
 	sessionService  *auth.SessionService
+	tokenService    *auth.TokenService
+	redisService    *auth.RedisService
 	logger          *logger.Logger
 }
 
@@ -19,13 +22,32 @@ type AuthHandler struct {
 func NewAuthHandler(
 	identityService *auth.IdentityService,
 	sessionService *auth.SessionService,
+	tokenService *auth.TokenService,
+	redisService *auth.RedisService,
 	logger *logger.Logger,
 ) *AuthHandler {
 	return &AuthHandler{
 		identityService: identityService,
 		sessionService:  sessionService,
+		tokenService:    tokenService,
+		redisService:    redisService,
 		logger:          logger,
 	}
+}
+
+// RefreshTokenRequest represents the HTTP request body for token refresh
+type RefreshTokenRequest struct {
+	RefreshToken string `json:"refresh_token"`
+	SessionID    string `json:"session_id,omitempty"`
+}
+
+// RefreshTokenResponse represents the HTTP response body for token refresh
+type RefreshTokenResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresIn    int64  `json:"expires_in"`
+	TokenType    string `json:"token_type"`
+	Message      string `json:"message"`
 }
 
 // SignupRequest represents the HTTP request body for user signup
@@ -194,8 +216,14 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create session
+	deviceID := r.Header.Get("X-Device-ID")
+	if deviceID == "" {
+		deviceID = "web_default"
+	}
+
 	createSessionInput := &auth.CreateSessionInput{
 		UserID:    identity.ID,
+		DeviceID:  deviceID,
 		UserAgent: userAgent,
 		IPAddress: clientIP,
 	}
@@ -221,6 +249,138 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	})
 
 	h.logger.Infof("user logged in: %d (%s) - session %s", identity.ID, req.Email, sessionOutput.Session.ID)
+}
+
+// HandleRefresh handles POST /auth/refresh requests
+//
+// This endpoint implements secure token rotation:
+// - Validates the refresh token
+// - Verifies the session is still active
+// - Revokes the old refresh token (token rotation)
+// - Issues new access and refresh tokens
+// - Returns the new token pair
+//
+//	Example: curl -X POST http://localhost:8080/auth/refresh \
+//	  -H "Content-Type: application/json" \
+//	  -H "Authorization: Bearer <access_token>" \
+//	  -d '{"refresh_token":"<refresh_token>","session_id":"abc123..."}'
+func (h *AuthHandler) HandleRefresh(w http.ResponseWriter, r *http.Request) {
+	h.logger.Debugf("handling token refresh request")
+
+	var req RefreshTokenRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Errorf("failed to decode request body: %v", err)
+		h.respondError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.RefreshToken == "" {
+		h.respondError(w, "Refresh token is required", http.StatusBadRequest)
+		return
+	}
+
+	// Validate refresh token
+	validateInput := &auth.ValidateTokenInput{
+		Token:     req.RefreshToken,
+		TokenType: auth.TokenTypeRefresh,
+	}
+
+	validateOutput, err := h.tokenService.ValidateToken(r.Context(), validateInput)
+	if err != nil {
+		h.logger.Errorf("token validation error: %v", err)
+		h.respondError(w, "Invalid refresh token", http.StatusUnauthorized)
+		return
+	}
+
+	if !validateOutput.IsValid {
+		h.logger.Warnf("invalid refresh token: %v", validateOutput.Error)
+		h.respondError(w, "Invalid or expired refresh token", http.StatusUnauthorized)
+		return
+	}
+
+	userID := validateOutput.Claims.UserID
+	deviceID := validateOutput.Claims.DeviceID
+	sessionID := validateOutput.Claims.SessionID
+
+	// If sessionID not provided in request, use the one from token
+	if req.SessionID != "" {
+		sessionID = req.SessionID
+	}
+
+	// Verify session is still active
+	sessionExists, err := h.sessionService.SessionRepository().SessionExists(r.Context(), sessionID)
+	if err != nil {
+		h.logger.Errorf("failed to check session existence: %v", err)
+		h.respondError(w, "Failed to validate session", http.StatusInternalServerError)
+		return
+	}
+
+	if !sessionExists {
+		h.logger.Warnf("session not found or revoked: %s for user %d", sessionID, userID)
+		h.respondError(w, "Session no longer valid", http.StatusUnauthorized)
+		return
+	}
+
+	// Get identity to ensure user is still active
+	identity, err := h.identityService.GetIdentityByID(r.Context(), userID)
+	if err != nil {
+		h.logger.Errorf("failed to get identity: %v", err)
+		h.respondError(w, "User not found", http.StatusUnauthorized)
+		return
+	}
+
+	// Check if account is active
+	if identity.AccountStatus != auth.AccountStatusActive {
+		h.logger.Warnf("user account not active: %d (status: %s)", userID, identity.AccountStatus)
+		h.respondError(w, "User account is not active", http.StatusForbidden)
+		return
+	}
+
+	// Refresh the token with rotation
+	refreshOutput, err := h.tokenService.RefreshToken(r.Context(), &auth.RefreshTokenInput{
+		RefreshToken: req.RefreshToken,
+		SessionID:    sessionID,
+		DeviceID:     deviceID,
+	})
+	if err != nil {
+		h.logger.Errorf("token refresh failed: %v", err)
+		h.respondError(w, "Failed to refresh token", http.StatusUnauthorized)
+		return
+	}
+
+	// Blacklist the old refresh token (token rotation)
+	oldClaims := validateOutput.Claims
+	if oldClaims.RegisteredClaims.ID != "" {
+		// Blacklist with TTL equal to the original refresh token TTL
+		ttl := h.tokenService.GetTokenExpiryTime(oldClaims).Sub(time.Now())
+		if ttl > 0 {
+			err = h.redisService.BlacklistToken(r.Context(), oldClaims.RegisteredClaims.ID, ttl)
+			if err != nil {
+				h.logger.Warnf("failed to blacklist old refresh token: %v", err)
+				// Don't fail the refresh, just log warning
+			}
+		}
+	}
+
+	// Touch session to update activity
+	err = h.sessionService.SessionRepository().TouchSession(r.Context(), sessionID)
+	if err != nil {
+		h.logger.Warnf("failed to touch session: %v", err)
+		// Don't fail, just log warning
+	}
+
+	// Return new tokens
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(RefreshTokenResponse{
+		AccessToken:  refreshOutput.NewAccessToken,
+		RefreshToken: refreshOutput.NewRefreshToken,
+		ExpiresIn:    refreshOutput.ExpiresIn,
+		TokenType:    "Bearer",
+		Message:      "Token refreshed successfully",
+	})
+
+	h.logger.Infof("token refreshed for user %d (session: %s)", userID, sessionID)
 }
 
 // HandleLogout handles POST /auth/logout requests
@@ -285,5 +445,6 @@ func (h *AuthHandler) respondError(w http.ResponseWriter, message string, status
 func RegisterAuthRoutes(mux *http.ServeMux, handler *AuthHandler) {
 	mux.HandleFunc("POST /auth/signup", handler.HandleSignup)
 	mux.HandleFunc("POST /auth/login", handler.HandleLogin)
+	mux.HandleFunc("POST /auth/refresh", handler.HandleRefresh)
 	mux.HandleFunc("POST /auth/logout", handler.HandleLogout)
 }

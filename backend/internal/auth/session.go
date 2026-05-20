@@ -28,6 +28,11 @@ func NewSessionService(config *AuthConfig, logger *logger.Logger, repo SessionRe
 	}
 }
 
+// SessionRepository returns the underlying session repository
+func (ss *SessionService) SessionRepository() SessionRepository {
+	return ss.repo
+}
+
 // CreateSessionInput represents input for session creation
 type CreateSessionInput struct {
 	UserID     int64
