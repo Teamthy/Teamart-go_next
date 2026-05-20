@@ -38,38 +38,6 @@ func (ps *PasswordService) HashPassword(ctx context.Context, input *HashPassword
 	return fmt.Sprintf("%x", hash), nil
 }
 
-// VerifyPasswordInput represents input for password verification
-type VerifyPasswordInput struct {
-	ProvidedPassword string
-	StoredHash       string
-	UserID           int64
-}
-
-// VerifyPasswordOutput represents the result of password verification
-type VerifyPasswordOutput struct {
-	IsValid bool
-	UserID  int64
-}
-
-// VerifyPassword verifies a password against its hash
-func (ps *PasswordService) VerifyPassword(ctx context.Context, input *VerifyPasswordInput) (*VerifyPasswordOutput, error) {
-	if input.ProvidedPassword == "" {
-		return nil, fmt.Errorf("password cannot be empty")
-	}
-	if input.StoredHash == "" {
-		return nil, fmt.Errorf("stored hash cannot be empty")
-	}
-
-	// In production, use bcrypt or argon2 Compare function
-	hash := sha256.Sum256([]byte(input.ProvidedPassword))
-	isValid := fmt.Sprintf("%x", hash) == input.StoredHash
-
-	return &VerifyPasswordOutput{
-		IsValid: isValid,
-		UserID:  input.UserID,
-	}, nil
-}
-
 // ===== Account Recovery Service =====
 
 // AccountRecoveryService manages account recovery processes

@@ -60,13 +60,13 @@ func (s *OTPService) GenerateOTP(ctx context.Context, input *GenerateOTPInput) (
 
 	// Hash the code for storage
 	codeHash := s.hashOTP(code)
-	
+
 	// Generate unique ID
 	id := s.generateRandomID()
-	
+
 	expiresAt := time.Now().Add(s.config.OTPTTL)
 
-	s.logger.Infof("OTP generated for user %d via %s, expires at %v", 
+	s.logger.Infof("OTP generated for user %d via %s, expires at %v",
 		input.UserID, input.Type, expiresAt)
 
 	return &GenerateOTPOutput{
@@ -89,9 +89,9 @@ type VerifyOTPInput struct {
 
 // VerifyOTPOutput represents the result of OTP verification
 type VerifyOTPOutput struct {
-	IsValid   bool
-	UserID    int64
-	Type      OTPType
+	IsValid    bool
+	UserID     int64
+	Type       OTPType
 	VerifiedAt time.Time
 }
 
@@ -117,7 +117,7 @@ func (s *OTPService) VerifyOTP(ctx context.Context, input *VerifyOTPInput) (*Ver
 	// 5. Mark as verified if correct
 	// 6. Return error if incorrect
 
-	codeHash := s.hashOTP(input.Code)
+	_ = s.hashOTP(input.Code) // TODO: Compare with stored hash when persistence is added
 
 	// Simulate verification
 	return &VerifyOTPOutput{
@@ -143,7 +143,7 @@ func (s *OTPService) RevokeOTP(ctx context.Context, input *RevokeOTPInput) error
 		return fmt.Errorf("OTP ID is required")
 	}
 
-	s.logger.Infof("revoking OTP %s for user %d (reason: %s)", 
+	s.logger.Infof("revoking OTP %s for user %d (reason: %s)",
 		input.OTPID, input.UserID, input.Reason)
 
 	// In a real implementation, this would mark the OTP as revoked in the database
@@ -166,7 +166,7 @@ func (s *OTPService) ValidateOTPAttempt(ctx context.Context, userID int64, curre
 func (s *OTPService) generateRandomCode(length int) (string, error) {
 	const digits = "0123456789"
 	code := make([]byte, length)
-	
+
 	for i := 0; i < length; i++ {
 		b := make([]byte, 1)
 		if _, err := rand.Read(b); err != nil {
@@ -174,7 +174,7 @@ func (s *OTPService) generateRandomCode(length int) (string, error) {
 		}
 		code[i] = digits[int(b[0])%len(digits)]
 	}
-	
+
 	return string(code), nil
 }
 

@@ -1,6 +1,10 @@
 package auth
 
-import "time"
+import (
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+)
 
 // ===== State Management =====
 
@@ -169,10 +173,12 @@ type JWTClaims struct {
 	SessionID   string    `json:"session_id,omitempty"`
 	DeviceID    string    `json:"device_id,omitempty"`
 	Permissions []string  `json:"permissions,omitempty"`
-	IssuedAt    time.Time `json:"iat"`
-	ExpiresAt   time.Time `json:"exp"`
-	NotBefore   time.Time `json:"nbf"`
-	JRTI        string    `json:"jti"` // JWT Token ID for rotation tracking
+}
+
+// CustomClaims wraps JWTClaims with StandardClaims for jwt.Claims interface compatibility
+type CustomClaims struct {
+	JWTClaims
+	jwt.RegisteredClaims
 }
 
 // TokenPair represents an access token and refresh token pair
