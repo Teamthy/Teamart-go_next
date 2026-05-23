@@ -1,5 +1,5 @@
-import CreatorProfileCard from "@/components/CreatorProfileCard";
-import ProductCard from "@/components/ProductCard";
+import CreatorProfileCard from "@/components/product/CreatorProfileCard";
+import ProductCard from "@/components/product/ProductCard";
 import { recommendedProducts } from "@/lib/mock-data";
 
 export default function CreatorProfilePage() {

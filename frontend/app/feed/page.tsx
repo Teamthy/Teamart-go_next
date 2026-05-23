@@ -1,11 +1,23 @@
 "use client";
 
+import { useEffect } from "react";
 import ProductCard from "@/components/product/ProductCard";
 import SectionHeader from "@/components/ui/SectionHeader";
+import { ProductGridSkeleton } from "@/components/ui/Skeleton";
 import { useFeed } from "@/hooks/useFeed";
+import useAppStore from "@/store/useAppStore";
 
 export default function FeedPage() {
     const { items, isLoading, error } = useFeed(50);
+    const liveFeedCount = useAppStore((state) => state.liveFeedCount);
+    const resetLiveFeedCount = useAppStore((state) => state.resetLiveFeedCount);
+
+    useEffect(() => {
+        if (liveFeedCount > 0 && items.length > 0) {
+            const timer = window.setTimeout(() => resetLiveFeedCount(), 5000);
+            return () => window.clearTimeout(timer);
+        }
+    }, [items.length, liveFeedCount, resetLiveFeedCount]);
 
     return (
         <div className="space-y-8">
@@ -14,9 +26,11 @@ export default function FeedPage() {
                 description="Browse the latest products from creators and tailored recommendations."
             />
 
-            {isLoading && (
-                <div className="flex justify-center items-center py-12">
-                    <p className="text-gray-500 dark:text-gray-400">Loading feed...</p>
+            {isLoading && <ProductGridSkeleton />}
+
+            {liveFeedCount > 0 && !isLoading && (
+                <div className="rounded-3xl border border-slate-200 bg-sky-50 p-4 text-sm text-slate-700 shadow-sm">
+                    Live feed updated with {liveFeedCount} new product{liveFeedCount !== 1 ? "s" : ""}. Changes are applied automatically.
                 </div>
             )}
 
@@ -37,7 +51,16 @@ export default function FeedPage() {
             {!isLoading && items.length > 0 && (
                 <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
                     {items.map((product) => (
-                        <ProductCard key={product.id} product={product} />
+                        <ProductCard
+                            key={product.id}
+                            product={{
+                                id: String(product.id),
+                                name: product.name,
+                                description: product.description || "",
+                                price: `$${product.price?.toFixed(2) ?? "0.00"}`,
+                                image: product.image_url || "",
+                            }}
+                        />
                     ))}
                 </div>
             )}
