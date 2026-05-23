@@ -33,6 +33,17 @@ const (
 	EventTypeStreamStarted    EventType = "stream.started"
 	EventTypeStreamEnded      EventType = "stream.ended"
 
+	// Analytics events
+	EventTypeViewerJoined     EventType = "analytics.viewer.joined"
+	EventTypeViewerLeft       EventType = "analytics.viewer.left"
+	EventTypeReactionSent     EventType = "analytics.reaction.sent"
+	EventTypeGiftSent         EventType = "analytics.gift.sent"
+	EventTypeProductPinned    EventType = "analytics.product.pinned"
+	EventTypeOrderCreated     EventType = "analytics.order.created"
+	EventTypePaymentCompleted EventType = "analytics.payment.completed"
+	EventTypeCartStarted      EventType = "analytics.cart.started"
+	EventTypeCartAbandoned    EventType = "analytics.cart.abandoned"
+
 	// KYC events
 	EventTypeKYCSubmitted EventType = "kyc.submitted"
 	EventTypeKYCApproved  EventType = "kyc.approved"
@@ -184,6 +195,18 @@ func (ep *EventPublisher) PublishSecurityEvent(ctx context.Context, eventType Ev
 		Severity:  "critical",
 	}
 
+	return ep.PublishEvent(ctx, event)
+}
+
+func (ep *EventPublisher) PublishAnalyticsEvent(ctx context.Context, eventType EventType, userID int64, data map[string]interface{}) error {
+	event := &AuditEvent{
+		EventType: eventType,
+		UserID:    userID,
+		Timestamp: time.Now(),
+		Data:      data,
+		Source:    "analytics",
+		Severity:  "info",
+	}
 	return ep.PublishEvent(ctx, event)
 }
 
