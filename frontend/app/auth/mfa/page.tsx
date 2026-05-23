@@ -1,4 +1,4 @@
-import AuthTemplate from "@/components/AuthTemplate";
+import AuthTemplate from "@/components/auth/AuthTemplate";
 
 export default function MfaPage() {
     return <AuthTemplate variant="mfa" />;
