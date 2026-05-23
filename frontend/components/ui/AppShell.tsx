@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import NotificationBell from "@/components/ui/NotificationBell";
 
 const navItems = [
     { href: "/", label: "Home" },
@@ -21,17 +22,20 @@ export default function AppShell({ children }: { children: ReactNode }) {
                     <Link href="/" className="text-lg font-semibold tracking-tight text-slate-900">
                         Teamart Customer Web
                     </Link>
-                    <nav className="hidden items-center gap-3 md:flex">
-                        {navItems.map((item) => (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                className="rounded-full px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-                            >
-                                {item.label}
-                            </Link>
-                        ))}
-                    </nav>
+                    <div className="hidden items-center gap-3 md:flex">
+                        <nav className="flex items-center gap-3">
+                            {navItems.map((item) => (
+                                <Link
+                                    key={item.href}
+                                    href={item.href}
+                                    className="rounded-full px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+                                >
+                                    {item.label}
+                                </Link>
+                            ))}
+                        </nav>
+                        <NotificationBell />
+                    </div>
                 </div>
             </header>
             <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">{children}</main>
