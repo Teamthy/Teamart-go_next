@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import * as api from "@/lib/api";
 
 export interface FeedItem {
@@ -14,33 +14,25 @@ export interface FeedItem {
 }
 
 export function useFeed(limit = 50) {
-    const [items, setItems] = useState<FeedItem[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        const fetchFeed = async () => {
-            setIsLoading(true);
-            setError(null);
+    const query = useQuery<FeedItem[], Error>({
+        queryKey: ["feed", limit],
+        queryFn: async () => {
             try {
-                const response = await api.getFeed(limit);
-                setItems(response || []);
-            } catch (err: any) {
-                setError(err.message || "Failed to fetch feed");
-                // Fallback to products list if feed fails
-                try {
-                    const productsRes = await api.listProducts(limit, 0);
-                    setItems(productsRes.products || []);
-                } catch (fallbackErr) {
-                    console.error("Error fetching feed and products:", fallbackErr);
-                }
-            } finally {
-                setIsLoading(false);
+                return await api.getFeed(limit);
+            } catch (error) {
+                const fallback = await api.listProducts(limit, 0);
+                return fallback.products || [];
             }
-        };
+        },
+        staleTime: 1000 * 60 * 2,
+        retry: 1,
+        refetchOnWindowFocus: false,
+    });
 
-        fetchFeed();
-    }, [limit]);
-
-    return { items, isLoading, error };
+    return {
+        items: (query.data ?? []) as FeedItem[],
+        isLoading: query.isLoading,
+        error: query.isError ? (query.error as Error)?.message ?? "Unable to load feed" : null,
+        refetch: query.refetch,
+    };
 }
