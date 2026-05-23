@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -19,10 +20,11 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Port        int
-	Host        string
-	Environment string
-	Timeout     time.Duration
+	Port               int
+	Host               string
+	Environment        string
+	Timeout            time.Duration
+	CORSAllowedOrigins []string
 }
 
 type DatabaseConfig struct {
@@ -74,10 +76,11 @@ type LoggerConfig struct {
 func Load() (*Config, error) {
 	return &Config{
 		Server: ServerConfig{
-			Port:        getEnvInt("SERVER_PORT", 8000),
-			Host:        getEnv("SERVER_HOST", "0.0.0.0"),
-			Environment: getEnv("SERVER_ENV", "development"),
-			Timeout:     getDuration("SERVER_TIMEOUT", 30*time.Second),
+			Port:               getEnvInt("SERVER_PORT", 8000),
+			Host:               getEnv("SERVER_HOST", "0.0.0.0"),
+			Environment:        getEnv("SERVER_ENV", "development"),
+			Timeout:            getDuration("SERVER_TIMEOUT", 30*time.Second),
+			CORSAllowedOrigins: getEnvList("CORS_ALLOWED_ORIGINS", []string{"http://localhost:3000"}),
 		},
 		Database: DatabaseConfig{
 			URL:             mustGetEnv("DATABASE_URL"),
@@ -147,6 +150,27 @@ func getEnvInt(key string, defaultValue int) int {
 		panic(fmt.Sprintf("invalid integer value for %s: %s", key, value))
 	}
 	return intVal
+}
+
+func getEnvList(key string, defaultValue []string) []string {
+	value := getEnv(key, "")
+	if value == "" {
+		return defaultValue
+	}
+
+	parts := strings.Split(value, ",")
+	var list []string
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			list = append(list, trimmed)
+		}
+	}
+
+	if len(list) == 0 {
+		return defaultValue
+	}
+	return list
 }
 
 func getDuration(key string, defaultValue time.Duration) time.Duration {
