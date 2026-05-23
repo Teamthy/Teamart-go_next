@@ -1,5 +1,5 @@
-import CartSummary from "@/components/CartSummary";
-import SectionHeader from "@/components/SectionHeader";
+import CartSummary from "@/components/order/CartSummary";
+import SectionHeader from "@/components/ui/SectionHeader";
 
 export default function CartPage() {
     return (
