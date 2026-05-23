@@ -15,6 +15,12 @@ import (
 	"github.com/teamart/commerce-api/internal/infra/database"
 	"github.com/teamart/commerce-api/internal/infra/migrations"
 	"github.com/teamart/commerce-api/internal/infra/queries"
+	"github.com/teamart/commerce-api/internal/livestream"
+	"github.com/teamart/commerce-api/internal/media"
+	"github.com/teamart/commerce-api/internal/realtime/gateway"
+	"github.com/teamart/commerce-api/internal/realtime/pubsub"
+	realtimewebsocket "github.com/teamart/commerce-api/internal/realtime/websocket"
+	"github.com/teamart/commerce-api/internal/streaming"
 	"github.com/teamart/commerce-api/pkg/app"
 	"github.com/teamart/commerce-api/pkg/logger"
 )
@@ -95,15 +101,16 @@ func main() {
 	// Create auth configuration
 	authConfig := createAuthConfig()
 
-	// Create router with all handlers
-	router := createRouter(log, db, runner, q, authConfig)
+	// Create livestream and streaming services
+	livestreamService := livestream.NewService()
+	streamingService := streaming.NewService(cfg.Streaming, media.NewFFmpegTranscoder(cfg.Streaming, log), log)
+	router := createRouter(log, db, runner, q, authConfig, livestreamService, streamingService)
 
 	// Run application
 	if err := application.Run(router); err != nil {
 		log.Errorf("application error: %v", err)
 		os.Exit(1)
 	}
-}
 }
 
 // createRouter creates and configures the HTTP router
@@ -113,15 +120,23 @@ func createRouter(
 	migrationRunner migrations.MigrationRunner,
 	q *queries.Queries,
 	authConfig *auth.AuthConfig,
+	livestreamService *livestream.Service,
+	streamingService *streaming.Service,
 ) http.Handler {
 	mux := http.NewServeMux()
 
 	// Register health check endpoints
 	handlers.RegisterHealthRoutes(mux)
 
-	// Register all API handlers (auth, users, products, orders)
+	// Register all API handlers (auth, users, products, orders, livestream, streaming)
 	// This initializes service layers and sets up all routes
-	handlers.SetupHandlers(mux, q, db, authConfig, log)
+	handlers.SetupHandlers(mux, q, db, authConfig, livestreamService, streamingService, log)
+
+	// Register realtime websocket route
+	tokenService := auth.NewTokenService(authConfig, log)
+	realtimeHub := gateway.NewHub(pubsub.NewInMemoryBroker())
+	realtimeServer := realtimewebsocket.NewServer(realtimeHub, realtimewebsocket.NewTokenAuthenticator(tokenService), livestreamService, log)
+	mux.Handle("/ws", realtimeServer)
 
 	// Health check endpoint
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {

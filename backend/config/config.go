@@ -4,18 +4,20 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
 type Config struct {
-	Server   ServerConfig
-	Database DatabaseConfig
-	Redis    RedisConfig
-	JWT      JWTConfig
-	OpenAI   OpenAIConfig
-	AWS      AWSConfig
-	Kafka    KafkaConfig
-	Logger   LoggerConfig
+	Server    ServerConfig
+	Database  DatabaseConfig
+	Redis     RedisConfig
+	JWT       JWTConfig
+	OpenAI    OpenAIConfig
+	AWS       AWSConfig
+	Kafka     KafkaConfig
+	Logger    LoggerConfig
+	Streaming StreamingConfig
 }
 
 type ServerConfig struct {
@@ -70,6 +72,31 @@ type LoggerConfig struct {
 	EnableJSON bool
 }
 
+type StreamingConfig struct {
+	RTMPIngestURL          string
+	HLSOutputPath          string
+	HLSBaseURL             string
+	MasterPlaylistName     string
+	SegmentDurationSeconds int
+	CDN                    CDNConfig
+	Profiles               []AdaptiveProfile
+}
+
+type CDNConfig struct {
+	Provider                 string
+	CloudflareZoneID         string
+	CloudFrontDistributionID string
+	BunnyCDNPullZone         string
+	EdgeKey                  string
+}
+
+type AdaptiveProfile struct {
+	Name         string
+	Resolution   string
+	Bitrate      string
+	AudioBitrate string
+}
+
 // Load loads configuration from environment variables with defaults
 func Load() (*Config, error) {
 	return &Config{
@@ -117,6 +144,21 @@ func Load() (*Config, error) {
 			Format:     getEnv("LOG_FORMAT", "json"),
 			EnableJSON: getBool("LOG_JSON", true),
 		},
+		Streaming: StreamingConfig{
+			RTMPIngestURL:          getEnv("STREAMING_RTMP_INGEST_URL", "rtmp://localhost:1935/live"),
+			HLSOutputPath:          getEnv("STREAMING_HLS_OUTPUT_PATH", "./data/hls"),
+			HLSBaseURL:             getEnv("STREAMING_HLS_BASE_URL", "https://cdn.teamart.com/streaming"),
+			MasterPlaylistName:     getEnv("STREAMING_MASTER_PLAYLIST_NAME", "master.m3u8"),
+			SegmentDurationSeconds: getEnvInt("STREAMING_SEGMENT_DURATION", 2),
+			CDN: CDNConfig{
+				Provider:                 getEnv("STREAMING_CDN_PROVIDER", "cloudfront"),
+				CloudflareZoneID:         getEnv("STREAMING_CLOUDFLARE_ZONE_ID", ""),
+				CloudFrontDistributionID: getEnv("STREAMING_CLOUDFRONT_DISTRIBUTION_ID", ""),
+				BunnyCDNPullZone:         getEnv("STREAMING_BUNNYCDN_PULL_ZONE", ""),
+				EdgeKey:                  getEnv("STREAMING_EDGE_KEY", ""),
+			},
+			Profiles: parseAdaptiveProfiles(getEnv("STREAMING_PROFILES", "720p:1280x720:2500k:128k;480p:854x480:1200k:96k;360p:640x360:800k:64k")),
+		},
 	}, nil
 }
 
@@ -135,6 +177,30 @@ func mustGetEnv(key string) string {
 		panic(fmt.Sprintf("required environment variable not set: %s", key))
 	}
 	return value
+}
+
+func parseAdaptiveProfiles(value string) []AdaptiveProfile {
+	profiles := make([]AdaptiveProfile, 0)
+	for _, raw := range strings.Split(value, ";") {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			continue
+		}
+		parts := strings.Split(raw, ":")
+		if len(parts) < 4 {
+			continue
+		}
+		profiles = append(profiles, AdaptiveProfile{
+			Name:         strings.TrimSpace(parts[0]),
+			Resolution:   strings.TrimSpace(parts[1]),
+			Bitrate:      strings.TrimSpace(parts[2]),
+			AudioBitrate: strings.TrimSpace(parts[3]),
+		})
+	}
+	if len(profiles) == 0 {
+		profiles = append(profiles, AdaptiveProfile{Name: "720p", Resolution: "1280x720", Bitrate: "2500k", AudioBitrate: "128k"})
+	}
+	return profiles
 }
 
 func getEnvInt(key string, defaultValue int) int {
