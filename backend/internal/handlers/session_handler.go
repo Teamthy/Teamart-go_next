@@ -319,7 +319,7 @@ func (h *SessionHandler) respondError(w http.ResponseWriter, message string, sta
 }
 
 // RegisterSessionRoutes registers all session management routes
-func RegisterSessionRoutes(mux *http.ServeMux, handler *SessionHandler) {
+func RegisterSessionRoutes(mux Router, handler *SessionHandler) {
 	mux.HandleFunc("GET /sessions/{user_id}", handler.HandleGetActiveSessions)
 	mux.HandleFunc("POST /sessions/validate", handler.HandleValidateSession)
 	mux.HandleFunc("POST /sessions/revoke", handler.HandleRevokeSession)

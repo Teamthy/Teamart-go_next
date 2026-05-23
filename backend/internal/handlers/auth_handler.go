@@ -442,7 +442,7 @@ func (h *AuthHandler) respondError(w http.ResponseWriter, message string, status
 }
 
 // RegisterAuthRoutes registers all authentication routes
-func RegisterAuthRoutes(mux *http.ServeMux, handler *AuthHandler) {
+func RegisterAuthRoutes(mux Router, handler *AuthHandler) {
 	mux.HandleFunc("POST /auth/signup", handler.HandleSignup)
 	mux.HandleFunc("POST /auth/login", handler.HandleLogin)
 	mux.HandleFunc("POST /auth/refresh", handler.HandleRefresh)

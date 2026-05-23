@@ -143,6 +143,6 @@ func HealthCheckHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // RegisterHealthRoutes registers health check routes
-func RegisterHealthRoutes(mux *http.ServeMux) {
+func RegisterHealthRoutes(mux Router) {
 	mux.HandleFunc("GET /health", HealthCheckHandler)
 }

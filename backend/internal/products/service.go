@@ -3,6 +3,7 @@ package products
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/teamart/commerce-api/internal/infra/queries"
 	"github.com/teamart/commerce-api/pkg/logger"
@@ -20,14 +21,6 @@ func NewService(queries *queries.Queries, logger *logger.Logger) *Service {
 		queries: queries,
 		logger:  logger,
 	}
-}
-
-// CreateProductInput represents the input for creating a product
-type CreateProductInput struct {
-	SKU         string
-	Name        string
-	Description string
-	Price       float64
 }
 
 // CreateProductOutput represents the output after creating a product
@@ -55,12 +48,12 @@ func (s *Service) CreateProduct(ctx context.Context, input *CreateProductInput) 
 
 	s.logger.Debugf("creating product with SKU: %s", input.SKU)
 
-	product, err := s.queries.CreateProduct(ctx, queries.CreateProductParams{
-		Sku:         input.SKU,
-		Name:        input.Name,
-		Description: input.Description,
-		Price:       input.Price,
-	})
+	var description *string
+	if input.Description != "" {
+		description = &input.Description
+	}
+
+	product, err := s.queries.CreateProduct(ctx, input.SKU, input.Name, description, strconv.FormatFloat(input.Price, 'f', 2, 64))
 	if err != nil {
 		s.logger.Errorf("failed to create product: %v", err)
 		return nil, fmt.Errorf("failed to create product: %w", err)
@@ -69,13 +62,18 @@ func (s *Service) CreateProduct(ctx context.Context, input *CreateProductInput) 
 	s.logger.Infof("product created successfully with ID: %d", product.ID)
 
 	return &CreateProductOutput{
-		ID:          product.ID,
-		SKU:         product.Sku,
-		Name:        product.Name,
-		Description: product.Description,
-		Price:       product.Price,
-		CreatedAt:   product.CreatedAt.String(),
-		UpdatedAt:   product.UpdatedAt.String(),
+		ID:   int64(product.ID),
+		SKU:  product.Sku,
+		Name: product.Name,
+		Description: func() string {
+			if product.Description.Valid {
+				return product.Description.String
+			}
+			return ""
+		}(),
+		Price:     numericToFloat64(product.Price),
+		CreatedAt: product.CreatedAt.String(),
+		UpdatedAt: product.UpdatedAt.String(),
 	}, nil
 }
 
@@ -103,20 +101,25 @@ func (s *Service) GetProductByID(ctx context.Context, input *GetProductByIDInput
 
 	s.logger.Debugf("fetching product with ID: %d", input.ProductID)
 
-	product, err := s.queries.GetProductByID(ctx, input.ProductID)
+	product, err := s.queries.GetProductByID(ctx, int32(input.ProductID))
 	if err != nil {
 		s.logger.Errorf("failed to fetch product: %v", err)
 		return nil, fmt.Errorf("failed to fetch product: %w", err)
 	}
 
 	return &GetProductByIDOutput{
-		ID:          product.ID,
-		SKU:         product.Sku,
-		Name:        product.Name,
-		Description: product.Description,
-		Price:       product.Price,
-		CreatedAt:   product.CreatedAt.String(),
-		UpdatedAt:   product.UpdatedAt.String(),
+		ID:   int64(product.ID),
+		SKU:  product.Sku,
+		Name: product.Name,
+		Description: func() string {
+			if product.Description.Valid {
+				return product.Description.String
+			}
+			return ""
+		}(),
+		Price:     numericToFloat64(product.Price),
+		CreatedAt: product.CreatedAt.String(),
+		UpdatedAt: product.UpdatedAt.String(),
 	}, nil
 }
 
@@ -151,13 +154,18 @@ func (s *Service) GetProductBySKU(ctx context.Context, input *GetProductBySKUInp
 	}
 
 	return &GetProductBySKUOutput{
-		ID:          product.ID,
-		SKU:         product.Sku,
-		Name:        product.Name,
-		Description: product.Description,
-		Price:       product.Price,
-		CreatedAt:   product.CreatedAt.String(),
-		UpdatedAt:   product.UpdatedAt.String(),
+		ID:   int64(product.ID),
+		SKU:  product.Sku,
+		Name: product.Name,
+		Description: func() string {
+			if product.Description.Valid {
+				return product.Description.String
+			}
+			return ""
+		}(),
+		Price:     numericToFloat64(product.Price),
+		CreatedAt: product.CreatedAt.String(),
+		UpdatedAt: product.UpdatedAt.String(),
 	}, nil
 }
 
@@ -169,9 +177,9 @@ type ListProductsInput struct {
 
 // ListProductsOutput represents the output
 type ListProductsOutput struct {
-	Products  []ProductData
-	Limit     int32
-	Offset    int32
+	Products []ProductData
+	Limit    int32
+	Offset   int32
 }
 
 type ProductData struct {
@@ -195,10 +203,7 @@ func (s *Service) ListProducts(ctx context.Context, input *ListProductsInput) (*
 
 	s.logger.Debugf("listing products with limit: %d, offset: %d", input.Limit, input.Offset)
 
-	products, err := s.queries.ListProducts(ctx, queries.ListProductsParams{
-		Limit:  input.Limit,
-		Offset: input.Offset,
-	})
+	products, err := s.queries.ListProducts(ctx, input.Limit, input.Offset)
 	if err != nil {
 		s.logger.Errorf("failed to list products: %v", err)
 		return nil, fmt.Errorf("failed to list products: %w", err)
@@ -212,13 +217,18 @@ func (s *Service) ListProducts(ctx context.Context, input *ListProductsInput) (*
 
 	for i, product := range products {
 		output.Products[i] = ProductData{
-			ID:          product.ID,
-			SKU:         product.Sku,
-			Name:        product.Name,
-			Description: product.Description,
-			Price:       product.Price,
-			CreatedAt:   product.CreatedAt.String(),
-			UpdatedAt:   product.UpdatedAt.String(),
+			ID:   int64(product.ID),
+			SKU:  product.Sku,
+			Name: product.Name,
+			Description: func() string {
+				if product.Description.Valid {
+					return product.Description.String
+				}
+				return ""
+			}(),
+			Price:     numericToFloat64(product.Price),
+			CreatedAt: product.CreatedAt.String(),
+			UpdatedAt: product.UpdatedAt.String(),
 		}
 	}
 
@@ -236,10 +246,10 @@ type SearchProductsInput struct {
 
 // SearchProductsOutput represents the output
 type SearchProductsOutput struct {
-	Products  []ProductData
-	Query     string
-	Limit     int32
-	Offset    int32
+	Products []ProductData
+	Query    string
+	Limit    int32
+	Offset   int32
 }
 
 // SearchProducts searches for products by name or description

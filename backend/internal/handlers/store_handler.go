@@ -268,7 +268,7 @@ func (h *StoreHandler) respondError(w http.ResponseWriter, message string, statu
 }
 
 // RegisterStoreRoutes registers all store management routes
-func RegisterStoreRoutes(mux *http.ServeMux, handler *StoreHandler) {
+func RegisterStoreRoutes(mux Router, handler *StoreHandler) {
 	mux.HandleFunc("GET /stores", handler.HandleListStores)
 	mux.HandleFunc("POST /stores", handler.HandleCreateStore)
 	mux.HandleFunc("GET /stores/{store_id}", handler.HandleGetStore)

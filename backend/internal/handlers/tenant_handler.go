@@ -96,7 +96,7 @@ func (h *TenantHandler) authorizeTenantAccess(r *http.Request, tenantID int64) b
 	return false
 }
 
-func RegisterTenantRoutes(mux *http.ServeMux, handler *TenantHandler) {
+func RegisterTenantRoutes(mux Router, handler *TenantHandler) {
 	mux.HandleFunc("GET /api/v1/tenants/{tenant_id}/settings", handler.HandleGetTenantSettings)
 	mux.HandleFunc("PUT /api/v1/tenants/{tenant_id}/settings", handler.HandleUpsertTenantSetting)
 }
