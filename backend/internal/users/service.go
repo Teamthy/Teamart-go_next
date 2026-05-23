@@ -56,11 +56,7 @@ func (s *Service) CreateUser(ctx context.Context, input *CreateUserInput) (*Crea
 	s.logger.Debugf("creating user with email: %s", input.Email)
 
 	// Execute the query using SQLC
-	user, err := s.queries.CreateUser(ctx, queries.CreateUserParams{
-		Email:        input.Email,
-		Name:         input.Name,
-		PasswordHash: input.PasswordHash,
-	})
+	user, err := s.queries.CreateUser(ctx, input.Email, input.Name, input.PasswordHash)
 	if err != nil {
 		s.logger.Errorf("failed to create user: %v", err)
 		return nil, fmt.Errorf("failed to create user: %w", err)
@@ -101,7 +97,7 @@ func (s *Service) GetUserByID(ctx context.Context, input *GetUserByIDInput) (*Ge
 
 	s.logger.Debugf("fetching user with ID: %d", input.UserID)
 
-	user, err := s.queries.GetUserByID(ctx, input.UserID)
+	user, err := s.queries.GetUserByID(ctx, int32(input.UserID))
 	if err != nil {
 		s.logger.Errorf("failed to fetch user: %v", err)
 		return nil, fmt.Errorf("failed to fetch user: %w", err)
@@ -190,10 +186,7 @@ func (s *Service) ListUsers(ctx context.Context, input *ListUsersInput) (*ListUs
 
 	s.logger.Debugf("listing users with limit: %d, offset: %d", input.Limit, input.Offset)
 
-	users, err := s.queries.ListUsers(ctx, queries.ListUsersParams{
-		Limit:  input.Limit,
-		Offset: input.Offset,
-	})
+	users, err := s.queries.ListUsers(ctx, input.Limit, input.Offset)
 	if err != nil {
 		s.logger.Errorf("failed to list users: %v", err)
 		return nil, fmt.Errorf("failed to list users: %w", err)
@@ -248,10 +241,7 @@ func (s *Service) UpdateUser(ctx context.Context, input *UpdateUserInput) (*Upda
 
 	s.logger.Debugf("updating user with ID: %d", input.UserID)
 
-	user, err := s.queries.UpdateUser(ctx, queries.UpdateUserParams{
-		ID:   input.UserID,
-		Name: input.Name,
-	})
+	user, err := s.queries.UpdateUser(ctx, int32(input.UserID), input.Name)
 	if err != nil {
 		s.logger.Errorf("failed to update user: %v", err)
 		return nil, fmt.Errorf("failed to update user: %w", err)
@@ -282,7 +272,7 @@ func (s *Service) DeleteUser(ctx context.Context, input *DeleteUserInput) error 
 
 	s.logger.Debugf("deleting user with ID: %d", input.UserID)
 
-	err := s.queries.DeleteUser(ctx, input.UserID)
+	err := s.queries.DeleteUser(ctx, int32(input.UserID))
 	if err != nil {
 		s.logger.Errorf("failed to delete user: %v", err)
 		return fmt.Errorf("failed to delete user: %w", err)
