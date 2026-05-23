@@ -32,6 +32,7 @@ export default function SellerDashboard() {
     });
     const [products, setProducts] = useState<any[]>([]);
     const [orders, setOrders] = useState<any[]>([]);
+    const [payouts, setPayouts] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -49,6 +50,12 @@ export default function SellerDashboard() {
                 const ordersRes = await api.listOrders(100, 0);
                 const ords = ordersRes.orders || [];
                 setOrders(ords);
+
+                // Placeholder payouts until payout API exists
+                setPayouts([
+                    { id: "payout1", amount: "$2,100", period: "June 2025", status: "PENDING" },
+                    { id: "payout2", amount: "$1,450", period: "May 2025", status: "COMPLETED" },
+                ]);
 
                 // Calculate stats
                 const inventoryValue = prods.reduce(
@@ -238,94 +245,87 @@ export default function SellerDashboard() {
                     </div>
                 )}
             </div>
-        </div>
-    );
-}
-<p className="mt-3 text-3xl font-semibold text-slate-900">${pendingPayout.toFixed(0)}</p>
-                    </div >
-                </div >
-            </div >
 
-    <div className="grid gap-8 lg:grid-cols-[1.5fr_1fr]">
-        <section className="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <SectionHeader
-                title="Inventory overview"
-                description="Track stock levels, price, status, and forecast your next sale window."
-            />
+            <div className="grid gap-8 lg:grid-cols-[1.5fr_1fr]">
+                <section className="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <SectionHeader
+                        title="Inventory overview"
+                        description="Track stock levels, price, status, and forecast your next sale window."
+                    />
 
-            <div className="overflow-hidden rounded-3xl border border-slate-200">
-                <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-                    <thead className="bg-slate-50">
-                        <tr>
-                            <th className="px-6 py-4 font-semibold text-slate-600">Product</th>
-                            <th className="px-6 py-4 font-semibold text-slate-600">Price</th>
-                            <th className="px-6 py-4 font-semibold text-slate-600">Inventory</th>
-                            <th className="px-6 py-4 font-semibold text-slate-600">Status</th>
-                            <th className="px-6 py-4 font-semibold text-slate-600">Sales</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200 bg-white">
-                        {sellerProducts.map((product) => (
-                            <tr key={product.id} className="hover:bg-slate-50">
-                                <td className="px-6 py-4">
-                                    <div className="text-sm font-semibold text-slate-900">{product.name}</div>
-                                    <div className="text-xs text-slate-500">{product.sku}</div>
-                                </td>
-                                <td className="px-6 py-4 text-slate-700">{product.price}</td>
-                                <td className="px-6 py-4 text-slate-700">{product.stock}</td>
-                                <td className="px-6 py-4">{statusBadge(product.status)}</td>
-                                <td className="px-6 py-4 text-slate-700">{product.sales}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </section>
+                    <div className="overflow-hidden rounded-3xl border border-slate-200">
+                        <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+                            <thead className="bg-slate-50">
+                                <tr>
+                                    <th className="px-6 py-4 font-semibold text-slate-600">Product</th>
+                                    <th className="px-6 py-4 font-semibold text-slate-600">Price</th>
+                                    <th className="px-6 py-4 font-semibold text-slate-600">Inventory</th>
+                                    <th className="px-6 py-4 font-semibold text-slate-600">Status</th>
+                                    <th className="px-6 py-4 font-semibold text-slate-600">Sales</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-200 bg-white">
+                                {products.slice(0, 10).map((product) => (
+                                    <tr key={product.id} className="hover:bg-slate-50">
+                                        <td className="px-6 py-4">
+                                            <div className="text-sm font-semibold text-slate-900">{product.name}</div>
+                                            <div className="text-xs text-slate-500">{product.sku}</div>
+                                        </td>
+                                        <td className="px-6 py-4 text-slate-700">{product.price}</td>
+                                        <td className="px-6 py-4 text-slate-700">{product.stock}</td>
+                                        <td className="px-6 py-4">{statusBadge(product.status)}</td>
+                                        <td className="px-6 py-4 text-slate-700">{product.sales}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
 
-        <div className="space-y-6">
-            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                <SectionHeader
-                    title="Recent orders"
-                    description="Review the latest customer orders and fulfillment status."
-                />
-                <div className="space-y-4">
-                    {sellerOrders.map((order) => (
-                        <div key={order.id} className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                            <div className="flex items-center justify-between gap-4">
-                                <div>
-                                    <div className="text-sm font-semibold text-slate-900">Order #{order.id}</div>
-                                    <div className="text-xs text-slate-500">{order.customer}</div>
+                <div className="space-y-6">
+                    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <SectionHeader
+                            title="Recent orders"
+                            description="Review the latest customer orders and fulfillment status."
+                        />
+                        <div className="space-y-4">
+                            {orders.map((order) => (
+                                <div key={order.id} className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                                    <div className="flex items-center justify-between gap-4">
+                                        <div>
+                                            <div className="text-sm font-semibold text-slate-900">Order #{order.id}</div>
+                                            <div className="text-xs text-slate-500">{order.customer}</div>
+                                        </div>
+                                        <span className={statusBadge(order.status)}>{order.status}</span>
+                                    </div>
+                                    <div className="mt-3 grid gap-2 text-sm text-slate-600">
+                                        <div>{order.items} items · {order.date}</div>
+                                        <div className="text-sm font-semibold text-slate-900">Total {order.total}</div>
+                                    </div>
                                 </div>
-                                <span className={statusBadge(order.status)}>{order.status}</span>
-                            </div>
-                            <div className="mt-3 grid gap-2 text-sm text-slate-600">
-                                <div>{order.items} items · {order.date}</div>
-                                <div className="text-sm font-semibold text-slate-900">Total {order.total}</div>
-                            </div>
+                            ))}
                         </div>
-                    ))}
-                </div>
-            </section>
+                    </section>
 
-            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                <SectionHeader
-                    title="Payouts"
-                    description="Keep track of completed and upcoming payments from recent sales."
-                />
-                <div className="space-y-4">
-                    {sellerPayouts.map((payout) => (
-                        <div key={payout.id} className="flex items-center justify-between rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4">
-                            <div>
-                                <p className="text-sm font-semibold text-slate-900">{payout.amount}</p>
-                                <p className="text-xs text-slate-500">{payout.period}</p>
-                            </div>
-                            <span className={statusBadge(payout.status)}>{payout.status}</span>
+                    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <SectionHeader
+                            title="Payouts"
+                            description="Keep track of completed and upcoming payments from recent sales."
+                        />
+                        <div className="space-y-4">
+                            {payouts.map((payout) => (
+                                <div key={payout.id} className="flex items-center justify-between rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4">
+                                    <div>
+                                        <p className="text-sm font-semibold text-slate-900">{payout.amount}</p>
+                                        <p className="text-xs text-slate-500">{payout.period}</p>
+                                    </div>
+                                    <span className={statusBadge(payout.status)}>{payout.status}</span>
+                                </div>
+                            ))}
                         </div>
-                    ))}
+                    </section>
                 </div>
-            </section>
-        </div>
-    </div>
+            </div>
         </div >
     );
 }
