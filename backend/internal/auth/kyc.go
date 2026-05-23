@@ -102,7 +102,7 @@ func (ks *KYCService) SubmitKYC(ctx context.Context, input *SubmitKYCInput) (*Su
 
 	// Store submission reference in Redis
 	submissionKey := fmt.Sprintf("kyc_submission:%d", input.UserID)
-	err := ks.redisService.(*RedisService).client.Set(ctx, submissionKey, "pending", 90*24*time.Hour).Err()
+	err := ks.redisService.client.Set(ctx, submissionKey, "pending", 90*24*time.Hour).Err()
 	if err != nil {
 		ks.logger.Errorf("failed to cache KYC submission: %v", err)
 		return nil, err
@@ -129,7 +129,7 @@ func (ks *KYCService) GetKYCStatus(ctx context.Context, userID int64) (*KYCSubmi
 	// TODO: In production, query from database
 	// For now, return from Redis cache
 	submissionKey := fmt.Sprintf("kyc_submission:%d", userID)
-	status, err := ks.redisService.(*RedisService).client.Get(ctx, submissionKey).Result()
+	status, err := ks.redisService.client.Get(ctx, submissionKey).Result()
 	if err != nil {
 		ks.logger.Debugf("no KYC submission found for user %d", userID)
 		return nil, nil
@@ -158,7 +158,7 @@ func (ks *KYCService) ApproveKYC(ctx context.Context, userID int64, approvedBy i
 	// Send approval email to user
 
 	submissionKey := fmt.Sprintf("kyc_submission:%d", userID)
-	err := ks.redisService.(*RedisService).client.Set(ctx, submissionKey, "approved", 365*24*time.Hour).Err()
+	err := ks.redisService.client.Set(ctx, submissionKey, "approved", 365*24*time.Hour).Err()
 	if err != nil {
 		return err
 	}
@@ -184,7 +184,7 @@ func (ks *KYCService) RejectKYC(ctx context.Context, userID int64, reason string
 	// Send rejection email with reason
 
 	submissionKey := fmt.Sprintf("kyc_submission:%d", userID)
-	err := ks.redisService.(*RedisService).client.Set(ctx, submissionKey, "rejected", 30*24*time.Hour).Err()
+	err := ks.redisService.client.Set(ctx, submissionKey, "rejected", 30*24*time.Hour).Err()
 	if err != nil {
 		return err
 	}

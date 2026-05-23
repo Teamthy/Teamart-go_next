@@ -221,14 +221,14 @@ func (fs *FraudDetectionService) CheckSignupFraud(ctx context.Context, email str
 func (fs *FraudDetectionService) TrackRefreshTokenPattern(ctx context.Context, userID int64) (bool, error) {
 	key := fmt.Sprintf("refresh_pattern:%d", userID)
 
-	count, err := fs.redisService.(*RedisService).client.Incr(ctx, key).Result()
+	count, err := fs.redisService.client.Incr(ctx, key).Result()
 	if err != nil {
 		return false, err
 	}
 
 	// Set expiration on first increment (1 hour window)
 	if count == 1 {
-		fs.redisService.(*RedisService).client.Expire(ctx, key, 1*time.Hour)
+		fs.redisService.client.Expire(ctx, key, 1*time.Hour)
 	}
 
 	// If more than 30 refreshes in 1 hour, it's suspicious
@@ -251,7 +251,7 @@ func (fs *FraudDetectionService) checkGeographicalImpossibility(ctx context.Cont
 func (fs *FraudDetectionService) checkNewDevice(ctx context.Context, userID int64, ipAddress string) bool {
 	// Check if this IP/device combination has been seen before
 	key := fmt.Sprintf("device_ip:%d:%s", userID, ipAddress)
-	exists, err := fs.redisService.(*RedisService).client.Exists(ctx, key).Result()
+	exists, err := fs.redisService.client.Exists(ctx, key).Result()
 	if err != nil {
 		return false
 	}
@@ -261,7 +261,7 @@ func (fs *FraudDetectionService) checkNewDevice(ctx context.Context, userID int6
 func (fs *FraudDetectionService) checkCredentialStuffing(ctx context.Context, email string, ipAddress string) bool {
 	// Check if there are many failed attempts across different accounts from same IP
 	key := fmt.Sprintf("attempted_emails:%s", ipAddress)
-	count, err := fs.redisService.(*RedisService).client.SCard(ctx, key).Result()
+	count, err := fs.redisService.client.SCard(ctx, key).Result()
 	if err != nil {
 		return false
 	}

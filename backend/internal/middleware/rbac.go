@@ -34,11 +34,11 @@ func (r *RBACMiddleware) RequireRole(roles ...string) func(http.Handler) http.Ha
 				return
 			}
 
-			// Get user roles from claims
+			// Check roles via permissions (roles may be represented as permissions)
 			hasRole := false
 			for _, requiredRole := range roles {
-				for _, userRole := range user.Roles {
-					if userRole == requiredRole {
+				for _, userPerm := range user.Permissions {
+					if userPerm == requiredRole || userPerm == "role:"+requiredRole {
 						hasRole = true
 						break
 					}
