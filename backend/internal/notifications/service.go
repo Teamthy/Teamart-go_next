@@ -6,7 +6,6 @@ import (
 
 	events "github.com/teamart/commerce-api/internal/events"
 	emailservice "github.com/teamart/commerce-api/internal/notifications/email"
-	rtNotifications "github.com/teamart/commerce-api/internal/realtime/notifications"
 )
 
 // NotificationChannel represents a delivery channel for notifications.
@@ -27,14 +26,27 @@ type NotificationPayload struct {
 	Data   map[string]interface{}
 }
 
+type realtimeNotifier interface {
+	CreateNotification(ctx context.Context, notification *Notification) error
+}
+
+// Notification represents a realtime notification payload.
+type Notification struct {
+	UserID  int64
+	Title   string
+	Body    string
+	Type    string
+	Payload map[string]interface{}
+}
+
 // Manager orchestrates centralized notification dispatch.
 type Manager struct {
 	emailService    *emailservice.EmailService
-	realtimeService *rtNotifications.NotificationService
+	realtimeService realtimeNotifier
 }
 
 // NewManager creates a centralized notification manager.
-func NewManager(emailService *emailservice.EmailService, realtimeService *rtNotifications.NotificationService) *Manager {
+func NewManager(emailService *emailservice.EmailService, realtimeService realtimeNotifier) *Manager {
 	return &Manager{
 		emailService:    emailService,
 		realtimeService: realtimeService,
@@ -67,7 +79,7 @@ func (m *Manager) SendUserNotification(ctx context.Context, payload *Notificatio
 	}
 
 	if useRealtime && m.realtimeService != nil && payload.UserID != 0 {
-		notification := &rtNotifications.Notification{
+		notification := &Notification{
 			UserID:  payload.UserID,
 			Title:   payload.Title,
 			Body:    payload.Body,
@@ -94,42 +106,37 @@ func (m *Manager) SendUserNotification(ctx context.Context, payload *Notificatio
 }
 
 // HandleEvent sends notifications for platform events.
-func (m *Manager) HandleEvent(ctx context.Context, event *events.Event) error {
+func (m *Manager) HandleEvent(ctx context.Context, event *events.AuditEvent) error {
 	if event == nil {
 		return fmt.Errorf("event cannot be nil")
 	}
 
-	userID := int64(0)
-	if event.UserID != nil {
-		userID = *event.UserID
-	}
-
 	payload := &NotificationPayload{
-		UserID: userID,
+		UserID: event.UserID,
 		Title:  "Platform Notification",
 		Body:   "You have a new update.",
-		Type:   string(event.Type),
-		Data:   event.Payload,
+		Type:   string(event.EventType),
+		Data:   event.Data,
 	}
 
-	switch event.Type {
-	case events.OrderCreated:
+	switch event.EventType {
+	case events.EventTypeOrderCreated:
 		payload.Title = "Order Created"
 		payload.Body = "Your order has been received and is being processed."
-	case events.PaymentCompleted:
+	case events.EventTypePaymentCompleted:
 		payload.Title = "Payment Completed"
 		payload.Body = "Your payment was processed successfully."
-	case events.CreatorCommissionPaid:
-		payload.Title = "Commission Paid"
-		payload.Body = "Your creator commission has been credited."
-	case events.LivestreamStarted:
+	case events.EventTypeCreatorOnboarded:
+		payload.Title = "Creator Onboarded"
+		payload.Body = "A new creator has been onboarded."
+	case events.EventTypeStreamStarted:
 		payload.Title = "Livestream Started"
 		payload.Body = "A creator livestream you follow has started."
-	case events.LivestreamEnded:
+	case events.EventTypeStreamEnded:
 		payload.Title = "Livestream Ended"
 		payload.Body = "A creator livestream you follow has ended."
 	default:
-		payload.Title = fmt.Sprintf("Event: %s", event.Type)
+		payload.Title = fmt.Sprintf("Event: %s", event.EventType)
 		payload.Body = "An event was published to your account."
 	}
 

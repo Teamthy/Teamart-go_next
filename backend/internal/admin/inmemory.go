@@ -64,7 +64,7 @@ func (s *InMemoryService) CreateDispute(ctx context.Context, d Dispute) error {
 	return nil
 }
 
-func (s *InMemoryService) ApprovePayout(ctx context.Context, payoutID string) error {
+func (s *InMemoryService) ApprovePayout(ctx context.Context, payoutID string, approverID int64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	p, ok := s.payouts[payoutID]
@@ -73,6 +73,7 @@ func (s *InMemoryService) ApprovePayout(ctx context.Context, payoutID string) er
 	}
 	p.Status = PayoutPaid
 	s.payouts[payoutID] = p
+	_ = approverID
 	return nil
 }
 

@@ -31,7 +31,7 @@ type CreateMerchantRequest struct {
 	Currency    string `json:"currency,omitempty"`
 }
 
-type CreateStoreRequest struct {
+type CreateMerchantStoreRequest struct {
 	Name        string          `json:"name"`
 	Description string          `json:"description,omitempty"`
 	Category    string          `json:"category,omitempty"`
@@ -48,14 +48,14 @@ type AddStaffRequest struct {
 func (h *MerchantHandler) HandleCreateMerchant(w http.ResponseWriter, r *http.Request) {
 	userID, err := middleware.GetUserIDFromContext(r.Context())
 	if err != nil {
-		h.logger.Warnf("unauthorized merchant create: %v", err)
+		h.log.Warnf("unauthorized merchant create: %v", err)
 		h.respondError(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	var req CreateMerchantRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.logger.Errorf("invalid request body: %v", err)
+		h.log.Errorf("invalid request body: %v", err)
 		h.respondError(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -67,7 +67,7 @@ func (h *MerchantHandler) HandleCreateMerchant(w http.ResponseWriter, r *http.Re
 		Currency:    req.Currency,
 	})
 	if err != nil {
-		h.logger.Errorf("failed to create merchant: %v", err)
+		h.log.Errorf("failed to create merchant: %v", err)
 		h.respondError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -89,7 +89,7 @@ func (h *MerchantHandler) HandleGetMerchant(w http.ResponseWriter, r *http.Reque
 
 	result, err := h.merchantSvc.GetMerchant(r.Context(), merchantID)
 	if err != nil {
-		respondError(w, "Merchant not found", http.StatusNotFound)
+		h.respondError(w, "Merchant not found", http.StatusNotFound)
 		return
 	}
 
@@ -114,7 +114,7 @@ func (h *MerchantHandler) HandleCreateStore(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	var req CreateStoreRequest
+	var req CreateMerchantStoreRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.respondError(w, "Invalid request body", http.StatusBadRequest)
 		return
@@ -248,7 +248,7 @@ func (h *MerchantHandler) respondError(w http.ResponseWriter, message string, co
 	respondJSON(w, code, map[string]any{"error": message})
 }
 
-func RegisterMerchantRoutes(mux *http.ServeMux, handler *MerchantHandler) {
+func RegisterMerchantRoutes(mux Router, handler *MerchantHandler) {
 	mux.HandleFunc("POST /api/v1/merchants", handler.HandleCreateMerchant)
 	mux.HandleFunc("GET /api/v1/merchants/{merchant_id}", handler.HandleGetMerchant)
 	mux.HandleFunc("POST /api/v1/merchants/{merchant_id}/stores", handler.HandleCreateStore)

@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/teamart/commerce-api/internal/auth"
+	"github.com/teamart/commerce-api/internal/middleware"
 	"github.com/teamart/commerce-api/pkg/logger"
 )
 
@@ -112,9 +113,7 @@ func (h *SessionHandler) HandleGetActiveSessions(w http.ResponseWriter, r *http.
 	}
 
 	// Get active sessions
-	output, err := h.sessionService.GetUserActiveSessions(r.Context(), &auth.GetUserActiveSessionsInput{
-		UserID: userID,
-	})
+	output, err := h.sessionService.GetUserActiveSessions(r.Context(), userID)
 	if err != nil {
 		h.logger.Errorf("service error: %v", err)
 		h.respondError(w, err.Error(), http.StatusInternalServerError)
@@ -131,8 +130,8 @@ func (h *SessionHandler) HandleGetActiveSessions(w http.ResponseWriter, r *http.
 			UserAgent:                    sess.UserAgent,
 			IPAddress:                    sess.IPAddress,
 			TrustLevel:                   string(sess.TrustLevel),
-			RequiresMFAStep:              sess.RequiresMFAStep,
-			RequiresPasswordVerification: sess.RequiresPasswordVerification,
+			RequiresMFAStep:              sess.RequiresMFAStep(),
+			RequiresPasswordVerification: sess.TrustLevel != auth.TrustLevelTrusted,
 			GeoCountry:                   sess.GeoLocation.Country,
 			GeoCity:                      sess.GeoLocation.City,
 			CreatedAt:                    sess.CreatedAt.Format("2006-01-02T15:04:05Z"),
@@ -209,8 +208,8 @@ func (h *SessionHandler) HandleValidateSession(w http.ResponseWriter, r *http.Re
 		IsValid:                      validateOutput.IsValid,
 		UserID:                       validateOutput.Session.UserID,
 		TrustLevel:                   string(validateOutput.Session.TrustLevel),
-		RequiresMFAStep:              validateOutput.Session.RequiresMFAStep,
-		RequiresPasswordVerification: validateOutput.Session.RequiresPasswordVerification,
+		RequiresMFAStep:              validateOutput.Session.RequiresMFAStep(),
+		RequiresPasswordVerification: validateOutput.Session.TrustLevel != auth.TrustLevelTrusted,
 		Message:                      "Session is valid",
 	})
 
@@ -243,7 +242,7 @@ func (h *SessionHandler) HandleRevokeSession(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Revoke session
-	_, err := h.sessionService.RevokeSession(r.Context(), &auth.RevokeSessionInput{
+	err := h.sessionService.RevokeSession(r.Context(), &auth.RevokeSessionInput{
 		SessionID: req.SessionID,
 		Reason:    reason,
 	})
@@ -284,10 +283,16 @@ func (h *SessionHandler) HandleTrustDevice(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	userID, err := middleware.GetUserIDFromContext(r.Context())
+	if err != nil {
+		h.respondError(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	// Trust device
-	output, err := h.sessionService.TrustDevice(r.Context(), &auth.TrustDeviceInput{
-		SessionID: req.SessionID,
-		DeviceID:  req.DeviceID,
+	err = h.sessionService.TrustDevice(r.Context(), &auth.TrustDeviceInput{
+		UserID:   userID,
+		DeviceID: req.DeviceID,
 	})
 	if err != nil {
 		h.logger.Errorf("service error: %v", err)
@@ -299,7 +304,7 @@ func (h *SessionHandler) HandleTrustDevice(w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(TrustDeviceResponse{
 		DeviceID:   req.DeviceID,
-		TrustLevel: string(output.TrustLevel),
+		TrustLevel: string(auth.TrustLevelTrusted),
 		Status:     "trusted",
 		Message:    "Device marked as trusted",
 	})
@@ -319,7 +324,7 @@ func (h *SessionHandler) respondError(w http.ResponseWriter, message string, sta
 }
 
 // RegisterSessionRoutes registers all session management routes
-func RegisterSessionRoutes(mux *http.ServeMux, handler *SessionHandler) {
+func RegisterSessionRoutes(mux Router, handler *SessionHandler) {
 	mux.HandleFunc("GET /sessions/{user_id}", handler.HandleGetActiveSessions)
 	mux.HandleFunc("POST /sessions/validate", handler.HandleValidateSession)
 	mux.HandleFunc("POST /sessions/revoke", handler.HandleRevokeSession)

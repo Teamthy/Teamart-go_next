@@ -41,9 +41,10 @@ type OrderResponse struct {
 }
 
 // HandleCreateOrder handles POST /orders requests
-// Example: curl -X POST http://localhost:8080/orders \
-//   -H "Content-Type: application/json" \
-//   -d '{"user_id":1,"total_amount":199.99,"status":"pending"}'
+//
+//	Example: curl -X POST http://localhost:8080/orders \
+//	  -H "Content-Type: application/json" \
+//	  -d '{"user_id":1,"total_amount":199.99,"status":"pending"}'
 func (h *OrderHandler) HandleCreateOrder(w http.ResponseWriter, r *http.Request) {
 	h.logger.Debugf("handling CreateOrder request")
 
@@ -289,7 +290,7 @@ func (h *OrderHandler) HandleListAllOrders(w http.ResponseWriter, r *http.Reques
 }
 
 // RegisterOrderRoutes registers all order-related routes
-func RegisterOrderRoutes(mux *http.ServeMux, handler *OrderHandler) {
+func RegisterOrderRoutes(mux Router, handler *OrderHandler) {
 	// Order endpoints
 	mux.HandleFunc("POST /orders", handler.HandleCreateOrder)
 	mux.HandleFunc("GET /orders", handler.HandleListAllOrders)

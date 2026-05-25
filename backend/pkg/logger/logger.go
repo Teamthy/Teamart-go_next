@@ -42,6 +42,19 @@ func New(level string, isDev bool) (*Logger, error) {
 	}, nil
 }
 
+// NewLogger is kept as a compatibility alias for tests and older call sites.
+func NewLogger(level string, isDev bool) *Logger {
+	if level == "test" {
+		return NewNoop()
+	}
+
+	logger, err := New(level, isDev)
+	if err != nil {
+		panic(err)
+	}
+	return logger
+}
+
 // NewNoop creates a no-op logger for testing
 func NewNoop() *Logger {
 	zapLogger := zap.NewNop()

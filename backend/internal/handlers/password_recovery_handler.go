@@ -17,6 +17,7 @@ import (
 // PasswordRecoveryHandler handles password recovery operations
 type PasswordRecoveryHandler struct {
 	identityService *auth.IdentityService
+	sessionService  *auth.SessionService
 	redisService    *auth.RedisService
 	emailService    interface{} // EmailService from notifications/email
 	logger          *logger.Logger
@@ -25,11 +26,13 @@ type PasswordRecoveryHandler struct {
 // NewPasswordRecoveryHandler creates a new password recovery handler
 func NewPasswordRecoveryHandler(
 	identityService *auth.IdentityService,
+	sessionService *auth.SessionService,
 	redisService *auth.RedisService,
 	logger *logger.Logger,
 ) *PasswordRecoveryHandler {
 	return &PasswordRecoveryHandler{
 		identityService: identityService,
+		sessionService:  sessionService,
 		redisService:    redisService,
 		logger:          logger,
 	}
@@ -107,8 +110,7 @@ func (h *PasswordRecoveryHandler) HandleForgotPassword(w http.ResponseWriter, r 
 
 	// Store reset token in Redis with 24-hour TTL
 	resetKey := "password_reset:" + resetTokenHash
-	err = h.redisService.(*auth.RedisService).client.Set(r.Context(), resetKey, identity.ID, 24*time.Hour).Err()
-	if err != nil {
+	if err := h.redisService.SetValue(r.Context(), resetKey, fmt.Sprintf("%d", identity.ID), 24*time.Hour); err != nil {
 		h.logger.Errorf("failed to store reset token: %v", err)
 		h.respondError(w, "Failed to initiate password recovery", http.StatusInternalServerError)
 		return
@@ -169,7 +171,7 @@ func (h *PasswordRecoveryHandler) HandleResetPassword(w http.ResponseWriter, r *
 	resetKey := "password_reset:" + resetTokenHash
 
 	// Retrieve the user ID from Redis
-	userIDStr, err := h.redisService.(*auth.RedisService).client.Get(r.Context(), resetKey).Result()
+	userIDStr, err := h.redisService.GetValue(r.Context(), resetKey)
 	if err != nil {
 		h.logger.Warnf("invalid or expired reset token")
 		h.respondError(w, "Invalid or expired reset token", http.StatusUnauthorized)
@@ -194,8 +196,8 @@ func (h *PasswordRecoveryHandler) HandleResetPassword(w http.ResponseWriter, r *
 
 	// Update password
 	err = h.identityService.UpdatePasswordHash(r.Context(), &auth.UpdatePasswordHashInput{
-		UserID:          identity.ID,
-		NewPasswordHash: req.NewPassword, // In production, hash this
+		UserID:      identity.ID,
+		NewPassword: req.NewPassword,
 	})
 	if err != nil {
 		h.logger.Errorf("failed to update password: %v", err)
@@ -204,17 +206,21 @@ func (h *PasswordRecoveryHandler) HandleResetPassword(w http.ResponseWriter, r *
 	}
 
 	// Revoke all sessions (force re-login)
-	err = h.identityService.RevokeAllSessions(r.Context(), &auth.RevokeAllSessionsInput{
-		UserID: identity.ID,
-		Reason: "password reset",
-	})
-	if err != nil {
-		h.logger.Warnf("failed to revoke sessions: %v", err)
-		// Don't fail the reset, just log warning
+	if h.sessionService != nil {
+		err = h.sessionService.RevokeAllUserSessions(r.Context(), &auth.RevokeAllUserSessionsInput{
+			UserID: identity.ID,
+			Reason: "password reset",
+		})
+		if err != nil {
+			h.logger.Warnf("failed to revoke sessions: %v", err)
+			// Don't fail the reset, just log warning
+		}
 	}
 
 	// Delete the reset token from Redis (single-use)
-	h.redisService.(*auth.RedisService).client.Del(r.Context(), resetKey)
+	if err := h.redisService.DeleteValue(r.Context(), resetKey); err != nil {
+		h.logger.Warnf("failed to delete reset token: %v", err)
+	}
 
 	h.logger.Infof("password reset completed for user: %d", identity.ID)
 

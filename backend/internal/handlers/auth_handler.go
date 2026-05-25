@@ -2,10 +2,16 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/teamart/commerce-api/internal/auth"
+	authoauth "github.com/teamart/commerce-api/internal/auth/oauth"
+	"github.com/teamart/commerce-api/internal/middleware"
 	"github.com/teamart/commerce-api/pkg/logger"
 )
 
@@ -15,6 +21,7 @@ type AuthHandler struct {
 	sessionService  *auth.SessionService
 	tokenService    *auth.TokenService
 	redisService    *auth.RedisService
+	oauthService    *authoauth.OAuthService
 	logger          *logger.Logger
 }
 
@@ -26,13 +33,73 @@ func NewAuthHandler(
 	redisService *auth.RedisService,
 	logger *logger.Logger,
 ) *AuthHandler {
+	oauthService := authoauth.NewOAuthService(authoauth.NewMemoryStateStorage())
+	_ = registerOAuthProviders(oauthService)
+
 	return &AuthHandler{
 		identityService: identityService,
 		sessionService:  sessionService,
 		tokenService:    tokenService,
 		redisService:    redisService,
+		oauthService:    oauthService,
 		logger:          logger,
 	}
+}
+
+func registerOAuthProviders(service *authoauth.OAuthService) error {
+	clientID := strings.TrimSpace(os.Getenv("GOOGLE_CLIENT_ID"))
+	clientSecret := strings.TrimSpace(os.Getenv("GOOGLE_CLIENT_SECRET"))
+	if clientID == "" || clientSecret == "" {
+		return fmt.Errorf("google oauth is not configured")
+	}
+
+	redirectURI := strings.TrimSpace(os.Getenv("GOOGLE_REDIRECT_URI"))
+	if redirectURI == "" {
+		baseURL := strings.TrimSpace(os.Getenv("PUBLIC_BASE_URL"))
+		if baseURL == "" {
+			baseURL = "http://localhost:8000"
+		}
+		redirectURI = strings.TrimSuffix(baseURL, "/") + "/auth/google/callback"
+	}
+
+	return service.RegisterProvider(&authoauth.OAuthConfig{
+		Provider:     authoauth.ProviderGoogle,
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		RedirectURI:  redirectURI,
+		Scopes:       []string{"openid", "email", "profile"},
+		Endpoints: authoauth.OAuthEndpoints{
+			AuthorizationURL: "https://accounts.google.com/o/oauth2/v2/auth",
+			TokenURL:         "https://oauth2.googleapis.com/token",
+			UserInfoURL:      "https://openidconnect.googleapis.com/v1/userinfo",
+		},
+	})
+}
+
+func buildOAuthRedirectURI(r *http.Request, provider authoauth.OAuthProvider) string {
+	if provider == authoauth.ProviderGoogle {
+		if redirectURI := strings.TrimSpace(os.Getenv("GOOGLE_REDIRECT_URI")); redirectURI != "" {
+			return redirectURI
+		}
+	}
+
+	scheme := "http"
+	if r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") {
+		scheme = "https"
+	}
+	return fmt.Sprintf("%s://%s/auth/%s/callback", scheme, r.Host, provider)
+}
+
+func (h *AuthHandler) serviceForOAuth(r *http.Request) (*authoauth.OAuthService, error) {
+	if h.oauthService != nil {
+		return h.oauthService, nil
+	}
+
+	service := authoauth.NewOAuthService(authoauth.NewMemoryStateStorage())
+	if err := registerOAuthProviders(service); err != nil {
+		return nil, err
+	}
+	return service, nil
 }
 
 // RefreshTokenRequest represents the HTTP request body for token refresh
@@ -191,17 +258,12 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify password and record login attempt
-	verifyOutput, err := h.identityService.VerifyPassword(r.Context(), &auth.VerifyPasswordInput{
-		UserID:   identity.ID,
-		Password: req.Password,
+	err = h.identityService.VerifyPassword(r.Context(), &auth.VerifyPasswordInput{
+		UserID:        identity.ID,
+		PlainPassword: req.Password,
 	})
 	if err != nil {
 		h.logger.Warnf("login failed: invalid password for user %d", identity.ID)
-		h.respondError(w, "Invalid credentials", http.StatusUnauthorized)
-		return
-	}
-
-	if !verifyOutput.IsValid {
 		h.respondError(w, "Invalid credentials", http.StatusUnauthorized)
 		return
 	}
@@ -242,8 +304,8 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		SessionID:        sessionOutput.Session.ID,
 		Email:            identity.Email,
 		Status:           string(sessionOutput.Session.TrustLevel),
-		RequiresMFA:      sessionOutput.Session.RequiresMFAStep,
-		RequiresPassword: sessionOutput.Session.RequiresPasswordVerification,
+		RequiresMFA:      sessionOutput.Session.RequiresMFAStep(),
+		RequiresPassword: sessionOutput.Session.TrustLevel != auth.TrustLevelTrusted,
 		Message:          "Login successful",
 		CreatedAt:        sessionOutput.Session.CreatedAt.Format("2006-01-02T15:04:05Z"),
 	})
@@ -403,14 +465,22 @@ func (h *AuthHandler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userID, err := middleware.GetUserIDFromContext(r.Context())
+	if err != nil {
+		h.logger.Warnf("logout failed: %v", err)
+		h.respondError(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	reason := req.Reason
 	if reason == "" {
 		reason = "user logout"
 	}
 
 	// Revoke session
-	_, err := h.sessionService.RevokeSession(r.Context(), &auth.RevokeSessionInput{
+	err = h.sessionService.RevokeSession(r.Context(), &auth.RevokeSessionInput{
 		SessionID: req.SessionID,
+		UserID:    userID,
 		Reason:    reason,
 	})
 	if err != nil {
@@ -430,6 +500,40 @@ func (h *AuthHandler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	h.logger.Infof("user logged out: session %s", req.SessionID)
 }
 
+// HandleOAuthStart redirects users to the configured OAuth provider authorization URL.
+func (h *AuthHandler) HandleOAuthStart(w http.ResponseWriter, r *http.Request) {
+	provider := authoauth.OAuthProvider(strings.ToLower(mux.Vars(r)["provider"]))
+	if provider == "" {
+		h.respondError(w, "Provider is required", http.StatusBadRequest)
+		return
+	}
+
+	service, err := h.serviceForOAuth(r)
+	if err != nil {
+		h.respondError(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+
+	config, err := service.GetProvider(provider)
+	if err != nil {
+		h.respondError(w, fmt.Sprintf("OAuth provider %s is not configured", provider), http.StatusServiceUnavailable)
+		return
+	}
+
+	if config.RedirectURI == "" {
+		config.RedirectURI = buildOAuthRedirectURI(r, provider)
+	}
+
+	authURL, _, err := service.GenerateAuthorizationURL(r.Context(), provider, config.RedirectURI)
+	if err != nil {
+		h.logger.Errorf("failed to generate OAuth URL for %s: %v", provider, err)
+		h.respondError(w, fmt.Sprintf("Failed to start OAuth flow for %s", provider), http.StatusBadGateway)
+		return
+	}
+
+	http.Redirect(w, r, authURL, http.StatusFound)
+}
+
 // respondError writes an error response to the client
 func (h *AuthHandler) respondError(w http.ResponseWriter, message string, statusCode int) {
 	w.Header().Set("Content-Type", "application/json")
@@ -442,9 +546,10 @@ func (h *AuthHandler) respondError(w http.ResponseWriter, message string, status
 }
 
 // RegisterAuthRoutes registers all authentication routes
-func RegisterAuthRoutes(mux *http.ServeMux, handler *AuthHandler) {
+func RegisterAuthRoutes(mux Router, handler *AuthHandler) {
 	mux.HandleFunc("POST /auth/signup", handler.HandleSignup)
 	mux.HandleFunc("POST /auth/login", handler.HandleLogin)
 	mux.HandleFunc("POST /auth/refresh", handler.HandleRefresh)
 	mux.HandleFunc("POST /auth/logout", handler.HandleLogout)
+	mux.HandleFunc("GET /auth/{provider}", handler.HandleOAuthStart)
 }

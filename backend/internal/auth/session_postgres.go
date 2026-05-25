@@ -392,3 +392,26 @@ func (r *SessionRepositoryPostgres) CleanupExpiredSessions(ctx context.Context, 
 
 	return result.RowsAffected(), nil
 }
+
+// SessionExists checks whether a session exists and is still valid.
+func (r *SessionRepositoryPostgres) SessionExists(ctx context.Context, sessionID string) (bool, error) {
+	if sessionID == "" {
+		return false, fmt.Errorf("session ID is required")
+	}
+
+	query := `
+		SELECT EXISTS (
+			SELECT 1
+			FROM sessions
+			WHERE id = $1 AND revoked_at IS NULL AND expires_at > NOW()
+		)
+	`
+
+	var exists bool
+	if err := r.db.QueryRow(ctx, query, sessionID).Scan(&exists); err != nil {
+		r.logger.Warnf("failed to check session existence: %v", err)
+		return false, fmt.Errorf("failed to check session existence: %w", err)
+	}
+
+	return exists, nil
+}

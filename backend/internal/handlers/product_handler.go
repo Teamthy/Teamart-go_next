@@ -43,9 +43,10 @@ type ProductResponse struct {
 }
 
 // HandleCreateProduct handles POST /products requests
-// Example: curl -X POST http://localhost:8080/products \
-//   -H "Content-Type: application/json" \
-//   -d '{"sku":"PROD001","name":"Product 1","description":"A great product","price":99.99}'
+//
+//	Example: curl -X POST http://localhost:8080/products \
+//	  -H "Content-Type: application/json" \
+//	  -d '{"sku":"PROD001","name":"Product 1","description":"A great product","price":99.99}'
 func (h *ProductHandler) HandleCreateProduct(w http.ResponseWriter, r *http.Request) {
 	h.logger.Debugf("handling CreateProduct request")
 
@@ -276,7 +277,7 @@ func (h *ProductHandler) HandleSearchProducts(w http.ResponseWriter, r *http.Req
 }
 
 // RegisterProductRoutes registers all product-related routes
-func RegisterProductRoutes(mux *http.ServeMux, handler *ProductHandler) {
+func RegisterProductRoutes(mux Router, handler *ProductHandler) {
 	// Product endpoints
 	mux.HandleFunc("POST /products", handler.HandleCreateProduct)
 	mux.HandleFunc("GET /products", handler.HandleListProducts)
