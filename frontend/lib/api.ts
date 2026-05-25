@@ -1,4 +1,4 @@
-export const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
+export const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
 // Rate limit tracking
 let rateLimitRemaining = 1000;

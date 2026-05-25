@@ -208,7 +208,7 @@ export default function CheckoutPage() {
                             required
                             className="w-full rounded-3xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-3 text-sm text-slate-900 dark:text-white placeholder-slate-600 dark:placeholder-slate-400"
                             placeholder="Card number"
-                            maxLength="19"
+                            maxLength={19}
                         />
 
                         <div className="grid gap-4 sm:grid-cols-2">
@@ -220,7 +220,7 @@ export default function CheckoutPage() {
                                 required
                                 className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-3 text-sm text-slate-900 dark:text-white placeholder-slate-600 dark:placeholder-slate-400"
                                 placeholder="MM / YY"
-                                maxLength="5"
+                                maxLength={5}
                             />
                             <input
                                 type="text"
@@ -230,7 +230,7 @@ export default function CheckoutPage() {
                                 required
                                 className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-3 text-sm text-slate-900 dark:text-white placeholder-slate-600 dark:placeholder-slate-400"
                                 placeholder="CVC"
-                                maxLength="3"
+                                maxLength={3}
                             />
                         </div>
 

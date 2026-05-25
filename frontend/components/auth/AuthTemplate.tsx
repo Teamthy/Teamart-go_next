@@ -1,10 +1,102 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as api from "@/lib/api";
 
-export default function AuthTemplate({ variant = "login" }: { variant?: "login" | "register" | "mfa" }) {
+type AuthVariant = "login" | "register" | "mfa";
+
+const socialProviders = [
+    {
+        name: "Google",
+        slug: "google",
+        icon: (
+            <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+                <path
+                    fill="#4285F4"
+                    d="M21.805 10.023h-9.68v3.908h5.504c-.239 1.44-1.701 4.226-5.504 4.226-3.312 0-6.006-2.744-6.006-6.128s2.694-6.128 6.006-6.128c1.887 0 3.155.8 3.88 1.5l2.65-2.57C16.74 3.9 14.8 3 12.125 3 7.5 3 3.7 6.8 3.7 11.5S7.5 20 12.125 20c5.93 0 7.8-4.156 7.8-7.94 0-.534-.057-1.03-.12-1.037z"
+                />
+            </svg>
+        ),
+    },
+];
+
+const stateConfig: Record<AuthVariant, { title: string; subtitle: string; panelTitle: string; panelCopy: string; actionLabel: string }> = {
+    login: {
+        title: "Sign in",
+        subtitle: "Welcome back! Please sign in to continue",
+        panelTitle: "Pick up where you left off",
+        panelCopy: "A fast path back to your storefront, orders, and creator tools.",
+        actionLabel: "Login",
+    },
+    register: {
+        title: "Create account",
+        subtitle: "Create an account to get started",
+        panelTitle: "Build your storefront faster",
+        panelCopy: "Start with a single account and move into your next campaign in minutes.",
+        actionLabel: "Create account",
+    },
+    mfa: {
+        title: "Verify",
+        subtitle: "Enter the verification code sent to you",
+        panelTitle: "Secure your next session",
+        panelCopy: "Confirm your device to finish sign in and keep your account protected.",
+        actionLabel: "Verify",
+    },
+};
+
+function buildArt(variant: AuthVariant) {
+    const palettes = {
+        login: { bg: "#0f172a", accent: "#8b5cf6", glow: "#38bdf8" },
+        register: { bg: "#052e2b", accent: "#34d399", glow: "#22d3ee" },
+        mfa: { bg: "#1f123f", accent: "#f59e0b", glow: "#f472b6" },
+    };
+
+    const palette = palettes[variant];
+    const svg = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 800">
+            <defs>
+                <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="${palette.bg}" />
+                    <stop offset="100%" stop-color="#111827" />
+                </linearGradient>
+            </defs>
+            <rect width="640" height="800" rx="40" fill="url(#bg)" />
+            <circle cx="480" cy="140" r="120" fill="${palette.glow}" fill-opacity="0.24" />
+            <circle cx="160" cy="220" r="100" fill="${palette.accent}" fill-opacity="0.2" />
+            <path d="M112 540C186 430 278 388 418 410C500 423 566 480 612 586" stroke="${palette.accent}" stroke-width="12" stroke-linecap="round" fill="none" stroke-opacity="0.9" />
+            <rect x="116" y="140" width="340" height="180" rx="24" fill="white" fill-opacity="0.08" />
+            <rect x="140" y="200" width="120" height="16" rx="8" fill="white" fill-opacity="0.9" />
+            <rect x="140" y="232" width="200" height="12" rx="6" fill="white" fill-opacity="0.7" />
+            <rect x="140" y="258" width="168" height="12" rx="6" fill="white" fill-opacity="0.4" />
+            <rect x="118" y="418" width="404" height="220" rx="28" fill="white" fill-opacity="0.06" stroke="white" stroke-opacity="0.12" />
+            <circle cx="180" cy="518" r="42" fill="${palette.glow}" fill-opacity="0.55" />
+            <rect x="244" y="488" width="180" height="14" rx="7" fill="white" fill-opacity="0.85" />
+            <rect x="244" y="520" width="160" height="10" rx="5" fill="white" fill-opacity="0.5" />
+        </svg>`;
+
+    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
+function persistAuthResponse(response: any) {
+    if (!response || typeof window === "undefined") {
+        return;
+    }
+
+    if (response.access_token) {
+        localStorage.setItem("access_token", response.access_token);
+    }
+    if (response.refresh_token) {
+        localStorage.setItem("refresh_token", response.refresh_token);
+    }
+    if (response.user) {
+        localStorage.setItem("user", JSON.stringify(response.user));
+    }
+
+    sessionStorage.setItem("session", JSON.stringify(response));
+}
+
+export default function AuthTemplate({ variant = "login" }: { variant?: AuthVariant }) {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [otp, setOtp] = useState("");
@@ -12,6 +104,13 @@ export default function AuthTemplate({ variant = "login" }: { variant?: "login" 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const router = useRouter();
+
+    const currentState = stateConfig[variant];
+    const artSrc = useMemo(() => buildArt(variant), [variant]);
+
+    const handleSocialLogin = (provider: string) => {
+        router.push(`/auth/social?provider=${provider}`);
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -22,11 +121,11 @@ export default function AuthTemplate({ variant = "login" }: { variant?: "login" 
             if (variant === "mfa") {
                 const pending = sessionStorage.getItem("pendingSession");
                 const sess = pending ? JSON.parse(pending) : null;
-                const sessionId = sess?.session_id || sess?.sessionID || sess?.sessionID;
+                const sessionId = sess?.session_id || sess?.sessionID;
                 if (!sessionId) throw new Error("Missing pending session for MFA");
 
-                await api.verifyOTP(sessionId, otp);
-                // on success clear pending and redirect home
+                const res = await api.verifyOTP(sessionId, otp);
+                persistAuthResponse(res);
                 sessionStorage.removeItem("pendingSession");
                 router.push("/");
                 return;
@@ -34,24 +133,23 @@ export default function AuthTemplate({ variant = "login" }: { variant?: "login" 
 
             if (variant === "login") {
                 const res = await api.login(email, password);
-                // store minimal session info and handle MFA flow
+                persistAuthResponse(res);
                 sessionStorage.setItem("session", JSON.stringify(res));
+
                 if (res.requires_mfa || res.requiresMFA) {
                     sessionStorage.setItem("pendingSession", JSON.stringify(res));
                     router.push("/auth/mfa");
-                } else {
-                    router.push("/");
+                    return;
                 }
+
+                router.push("/");
                 return;
             }
 
-            if (variant === "register") {
-                const res = await api.signup(email, password);
-                // after signup, direct user to login or show message
-                sessionStorage.setItem("signupResult", JSON.stringify(res));
-                router.push("/auth/login");
-                return;
-            }
+            const res = await api.signup(email, password);
+            persistAuthResponse(res);
+            sessionStorage.setItem("signupResult", JSON.stringify(res));
+            router.push("/auth/login");
         } catch (err: any) {
             setError(err?.message || "Request failed");
         } finally {
@@ -59,34 +157,44 @@ export default function AuthTemplate({ variant = "login" }: { variant?: "login" 
         }
     };
 
+    const footerLink = variant === "login" ? "/auth/register" : "/auth/login";
+    const footerPrompt = variant === "login" ? "Don’t have an account?" : "Already have an account?";
+    const footerCta = variant === "login" ? "Sign up" : "Sign in";
+
     return (
-        <div className="flex h-[700px] w-full">
-            <div className="w-full hidden md:inline-block">
-                <img
-                    className="h-full"
-                    src="https://raw.githubusercontent.com/prebuiltui/prebuiltui/main/assets/login/leftSideImage.png"
-                    alt="leftSideImage"
-                />
+        <div className="flex min-h-[700px] w-full overflow-hidden rounded-[32px] border border-gray-200 bg-white shadow-xl">
+            <div className="hidden md:flex md:w-[46%] relative items-center justify-center bg-slate-950">
+                <img src={artSrc} alt="Auth illustration" className="h-full w-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                <div className="absolute bottom-8 left-8 right-8 text-white">
+                    <p className="text-xs uppercase tracking-[0.35em] text-white/70">{variant === "login" ? "Secure sign in" : variant === "register" ? "New account" : "Step-up verification"}</p>
+                    <h2 className="mt-3 text-3xl font-semibold">{currentState.panelTitle}</h2>
+                    <p className="mt-3 max-w-md text-sm leading-6 text-white/85">{currentState.panelCopy}</p>
+                </div>
             </div>
 
-            <div className="w-full flex flex-col items-center justify-center">
-                <form onSubmit={handleSubmit} className="md:w-96 w-80 flex flex-col items-center justify-center">
-                    <h2 className="text-4xl text-gray-900 font-medium">{variant === "login" ? "Sign in" : variant === "register" ? "Create account" : "Verify"}</h2>
-                    <p className="text-sm text-gray-500/90 mt-3">
-                        {variant === "login"
-                            ? "Welcome back! Please sign in to continue"
-                            : variant === "register"
-                                ? "Create an account to get started"
-                                : "Enter the verification code sent to you"}
-                    </p>
+            <div className="w-full md:w-[54%] flex flex-col items-center justify-center px-6 py-10 sm:px-10 lg:px-14">
+                <form onSubmit={handleSubmit} className="w-full max-w-md flex flex-col items-center justify-center">
+                    <h2 className="text-4xl text-gray-900 font-medium">{currentState.title}</h2>
+                    <p className="text-sm text-gray-500/90 mt-3 text-center">{currentState.subtitle}</p>
 
-                    {error ? <div className="mt-4 rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div> : null}
+                    {error ? <div className="mt-4 w-full rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div> : null}
 
                     {variant !== "mfa" && (
                         <>
-                            <button type="button" className="w-full mt-8 bg-gray-500/10 flex items-center justify-center h-12 rounded-full">
-                                <img src="https://raw.githubusercontent.com/prebuiltui/prebuiltui/main/assets/login/googleLogo.svg" alt="googleLogo" />
-                            </button>
+                            <div className="mt-8 w-full space-y-3">
+                                {socialProviders.map((provider) => (
+                                    <button
+                                        type="button"
+                                        key={provider.slug}
+                                        onClick={() => handleSocialLogin(provider.slug)}
+                                        className="w-full h-12 rounded-full border border-gray-300 bg-white text-gray-700 hover:border-indigo-300 hover:text-indigo-600 transition-colors flex items-center justify-center gap-3"
+                                    >
+                                        {provider.icon}
+                                        <span>Continue with {provider.name}</span>
+                                    </button>
+                                ))}
+                            </div>
 
                             <div className="flex items-center gap-4 w-full my-5">
                                 <div className="w-full h-px bg-gray-300/90" />
@@ -129,21 +237,17 @@ export default function AuthTemplate({ variant = "login" }: { variant?: "login" 
                                         Remember me
                                     </label>
                                 </div>
-                                <a className="text-sm underline" href="#">
+                                <button type="button" className="text-sm underline" onClick={() => router.push("/auth/forgot-password")}>
                                     Forgot password?
-                                </a>
+                                </button>
                             </div>
 
                             <button disabled={loading} type="submit" className="mt-8 w-full h-11 rounded-full text-white bg-indigo-500 hover:opacity-90 transition-opacity">
-                                {loading ? "Working…" : variant === "login" ? "Login" : "Create account"}
+                                {loading ? "Working…" : currentState.actionLabel}
                             </button>
 
                             <p className="text-gray-500/90 text-sm mt-4">
-                                {variant === "login" ? (
-                                    <>Don’t have an account? <a className="text-indigo-400 hover:underline" href="#">Sign up</a></>
-                                ) : (
-                                    <>Already have an account? <a className="text-indigo-400 hover:underline" href="#">Sign in</a></>
-                                )}
+                                {footerPrompt} <button type="button" className="text-indigo-400 hover:underline" onClick={() => router.push(footerLink)}>{footerCta}</button>
                             </p>
                         </>
                     )}
@@ -162,7 +266,7 @@ export default function AuthTemplate({ variant = "login" }: { variant?: "login" 
                             </div>
 
                             <button disabled={loading} type="submit" className="mt-8 w-full h-11 rounded-full text-white bg-indigo-500 hover:opacity-90 transition-opacity">
-                                {loading ? "Verifying…" : "Verify"}
+                                {loading ? "Verifying…" : currentState.actionLabel}
                             </button>
                         </>
                     )}
