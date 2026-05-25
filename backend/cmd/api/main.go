@@ -18,6 +18,7 @@ import (
 	"github.com/teamart/commerce-api/internal/infra/database"
 	"github.com/teamart/commerce-api/internal/infra/migrations"
 	"github.com/teamart/commerce-api/internal/infra/queries"
+	"github.com/teamart/commerce-api/internal/middleware"
 	"github.com/teamart/commerce-api/internal/moderation"
 	realtimewebsocket "github.com/teamart/commerce-api/internal/realtime/websocket"
 	"github.com/teamart/commerce-api/pkg/app"
@@ -116,7 +117,12 @@ func main() {
 
 	router := createRouter(log, db, runner, q, authConfig, moderationService, analyticsService)
 
-	if err := application.Run(router); err != nil {
+	handler := http.Handler(router)
+	if len(cfg.Server.CORSAllowedOrigins) > 0 {
+		handler = middleware.NewCORSMiddleware(cfg.Server.CORSAllowedOrigins).Middleware(router)
+	}
+
+	if err := application.Run(handler); err != nil {
 		log.Errorf("application error: %v", err)
 		os.Exit(1)
 	}

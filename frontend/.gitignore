@@ -1,0 +1,188 @@
+# =========================================
+# MONOREPO ROOT .gitignore
+# =========================================
+
+# =========================================
+# DOCUMENTATION
+# =========================================
+
+docs/
+*.md
+*.MD
+*.txt
+*.pdf
+*.doc
+*.docx
+AGENTS.md
+CLAUDE.md
+
+# Keep important markdown if needed
+# !README.md
+
+
+# =========================================
+# ENV / SECRETS
+# =========================================
+
+.env
+.env.*
+!.env.example
+
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+secrets/
+credentials/
+
+
+# =========================================
+# NODE / NEXT.JS
+# =========================================
+
+node_modules/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+.next/
+out/
+build/
+dist/
+
+coverage/
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+*.tsbuildinfo
+next-env.d.ts
+
+.vercel/
+
+
+# =========================================
+# GO
+# =========================================
+
+# Go binaries
+bin/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go test
+*.test
+coverage.out
+
+# Vendor (optional)
+# vendor/
+
+# Go workspace
+go.work.sum
+
+
+# =========================================
+# CACHE
+# =========================================
+
+.cache/
+.tmp/
+temp/
+tmp/
+
+.eslintcache
+
+# Turbo / Monorepo
+.turbo/
+
+
+# =========================================
+# DATABASE
+# =========================================
+
+*.sqlite
+*.sqlite3
+*.db
+
+
+# =========================================
+# IDE / EDITOR
+# =========================================
+
+.vscode/
+.idea/
+
+*.swp
+*.swo
+*~
+
+# Visual Studio
+.vs/
+
+
+# =========================================
+# OS FILES
+# =========================================
+
+.DS_Store
+Thumbs.db
+
+
+# =========================================
+# LOGS
+# =========================================
+
+logs/
+*.log
+
+
+# =========================================
+# RUNTIME FILES
+# =========================================
+
+*.pid
+*.seed
+*.pid.lock
+
+
+# =========================================
+# DOCKER
+# =========================================
+
+docker-data/
+docker-volumes/
+
+
+# =========================================
+# FRONTEND GENERATED FILES
+# =========================================
+
+frontend/.next/
+frontend/node_modules/
+
+
+# =========================================
+# BACKEND GENERATED FILES
+# =========================================
+
+backend/tmp/
+backend/bin/
+
+
+# =========================================
+# MISC
+# =========================================
+
+cls
