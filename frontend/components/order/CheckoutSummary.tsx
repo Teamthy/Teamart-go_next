@@ -1,4 +1,4 @@
-import { cartItems } from "@/lib/mock-data";
+import { cartItems } from "@/lib/mock/orders";
 
 export default function CheckoutSummary() {
     const subtotal = cartItems.reduce((sum, item) => sum + Number(item.price.replace("$", "")) * item.qty, 0);

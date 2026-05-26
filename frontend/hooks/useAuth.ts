@@ -26,12 +26,41 @@ export function useAuth() {
         isAuthenticated: false,
     });
 
+    const persistAuthState = (response: any) => {
+        if (typeof window === "undefined") {
+            return response?.user ?? null;
+        }
+
+        const user = response?.user ?? null;
+        const sessionId = response?.session_id;
+
+        if (user) {
+            localStorage.setItem("user", JSON.stringify(user));
+        }
+
+        if (sessionId) {
+            localStorage.setItem("session_id", sessionId);
+        }
+
+        if (response?.access_token) {
+            localStorage.setItem("access_token", response.access_token);
+        }
+
+        if (response?.refresh_token) {
+            localStorage.setItem("refresh_token", response.refresh_token);
+        }
+
+        localStorage.setItem("session", JSON.stringify(response));
+
+        return user;
+    };
+
     // Initialize from localStorage
     useEffect(() => {
-        const token = localStorage.getItem("access_token");
         const userStr = localStorage.getItem("user");
+        const sessionId = localStorage.getItem("session_id");
 
-        if (token && userStr) {
+        if (userStr) {
             try {
                 const user = JSON.parse(userStr);
                 setState({
@@ -42,8 +71,19 @@ export function useAuth() {
                 });
             } catch (e) {
                 localStorage.removeItem("user");
+                localStorage.removeItem("session_id");
                 localStorage.removeItem("access_token");
             }
+            return;
+        }
+
+        if (sessionId) {
+            setState({
+                user: null,
+                isLoading: false,
+                error: null,
+                isAuthenticated: true,
+            });
         }
     }, []);
 
@@ -51,16 +91,13 @@ export function useAuth() {
         setState((prev) => ({ ...prev, isLoading: true, error: null }));
         try {
             const response = await api.login(email, password);
-
-            localStorage.setItem("access_token", response.access_token);
-            localStorage.setItem("refresh_token", response.refresh_token);
-            localStorage.setItem("user", JSON.stringify(response.user));
+            const user = persistAuthState(response);
 
             setState({
-                user: response.user,
+                user,
                 isLoading: false,
                 error: null,
-                isAuthenticated: true,
+                isAuthenticated: Boolean(user),
             });
 
             return response;
@@ -75,16 +112,13 @@ export function useAuth() {
         setState((prev) => ({ ...prev, isLoading: true, error: null }));
         try {
             const response = await api.signup(email, password);
-
-            localStorage.setItem("access_token", response.access_token);
-            localStorage.setItem("refresh_token", response.refresh_token);
-            localStorage.setItem("user", JSON.stringify(response.user));
+            const user = persistAuthState(response);
 
             setState({
-                user: response.user,
+                user,
                 isLoading: false,
                 error: null,
-                isAuthenticated: true,
+                isAuthenticated: Boolean(user),
             });
 
             return response;
@@ -98,6 +132,8 @@ export function useAuth() {
     const logout = () => {
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
+        localStorage.removeItem("session_id");
+        localStorage.removeItem("session");
         localStorage.removeItem("user");
         setState({
             user: null,
@@ -111,16 +147,13 @@ export function useAuth() {
         setState((prev) => ({ ...prev, isLoading: true, error: null }));
         try {
             const response = await api.verifyOTP(session_id, code);
-
-            localStorage.setItem("access_token", response.access_token);
-            localStorage.setItem("refresh_token", response.refresh_token);
-            localStorage.setItem("user", JSON.stringify(response.user));
+            const user = persistAuthState(response);
 
             setState({
-                user: response.user,
+                user,
                 isLoading: false,
                 error: null,
-                isAuthenticated: true,
+                isAuthenticated: Boolean(user),
             });
 
             return response;
