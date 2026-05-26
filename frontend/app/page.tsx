@@ -1,343 +1,193 @@
-"use client";
-
-import React from "react";
 import Link from "next/link";
+import FeedCard from "@/components/ui/FeedCard";
+import ProductCard from "@/components/product/ProductCard";
+import SectionHeader from "@/components/ui/SectionHeader";
+import Badge from "@/components/ui/badge";
+import Button from "@/components/ui/button";
+import Card from "@/components/ui/card";
+import { products, recommendedProducts } from "@/lib/mock/products";
+import { creators } from "@/lib/mock/creators";
+import { feedItems } from "@/lib/mock/feed";
+import { stores } from "@/lib/mock/stores";
+
+const categories = ["Fashion", "Beauty", "Home", "Tech", "Fitness", "Accessories"];
 
 export default function Home() {
-  const [mobileOpen, setMobileOpen] = React.useState(false);
-
   return (
-    <>
-      <style>
-        {`
-          @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
-
-          * {
-            font-family: "Poppins", sans-serif;
-          }
-
-          body {
-            background: #0b1120;
-          }
-        `}
-      </style>
-
-      {/* HERO SECTION */}
-      <header className="flex flex-col items-center bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white min-h-screen overflow-hidden">
-
-        {/* NAVBAR */}
-        <nav className="w-full border-b border-white/10 backdrop-blur-md bg-white/5 sticky top-0 z-50">
-          <div className="flex items-center justify-between px-6 md:px-12 lg:px-20 py-4">
-
-            {/* LOGO */}
-            <Link href="/" className="flex items-center gap-3">
-              <div className="size-10 rounded-xl bg-indigo-600 flex items-center justify-center text-lg font-bold shadow-lg shadow-indigo-600/30">
-                T
-              </div>
-
-              <div>
-                <h1 className="text-lg font-semibold tracking-tight">
-                  Teamart
-                </h1>
-                <p className="text-xs text-slate-400 -mt-1">
-                  AI Commerce Platform
-                </p>
-              </div>
-            </Link>
-
-            {/* MENU */}
-            <div
-              className={`
-                ${mobileOpen ? "max-md:w-full" : "max-md:w-0"}
-                max-md:fixed
-                max-md:top-0
-                max-md:left-0
-                max-md:h-screen
-                max-md:bg-slate-950/95
-                max-md:backdrop-blur-xl
-                max-md:flex-col
-                max-md:justify-center
-                max-md:overflow-hidden
-                max-md:transition-all
-                max-md:duration-300
-                flex items-center gap-8 text-sm
-              `}
-            >
-              <Link
-                href="#features"
-                onClick={() => setMobileOpen(false)}
-                className="text-slate-300 hover:text-white transition"
-              >
-                Features
-              </Link>
-
-              <Link
-                href="#creators"
-                onClick={() => setMobileOpen(false)}
-                className="text-slate-300 hover:text-white transition"
-              >
-                Creators
-              </Link>
-
-              <Link
-                href="#commerce"
-                onClick={() => setMobileOpen(false)}
-                className="text-slate-300 hover:text-white transition"
-              >
-                Commerce
-              </Link>
-
-              <Link
-                href="#pricing"
-                onClick={() => setMobileOpen(false)}
-                className="text-slate-300 hover:text-white transition"
-              >
-                Pricing
-              </Link>
-
-              <button
-                onClick={() => setMobileOpen(false)}
-                className="md:hidden bg-white text-black p-2 rounded-lg"
-              >
-                ✕
-              </button>
+    <div className="space-y-8 pb-12">
+      <section className="rounded-[32px] bg-[linear-gradient(135deg,#fff8fb_0%,#ffffff_55%,#ecfdf5_100%)] p-5 sm:p-6">
+        <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr] xl:items-center">
+          <div className="space-y-5">
+            <Badge tone="default">TikTok + Amazon + Seller Central layer</Badge>
+            <div className="space-y-3">
+              <p className="text-[11px] uppercase tracking-[0.24em] text-[#E91E63]">Teamart-go_next</p>
+              <h1 className="text-[30px] font-semibold tracking-tight text-zinc-900 sm:text-[34px]">
+                Premium social commerce with scroll-first discovery and checkout-ready moments.
+              </h1>
+              <p className="max-w-2xl text-sm leading-7 text-zinc-600 sm:text-[15px]">
+                Swipe through creator-led content, launch into live rooms, follow stores, and buy from a polished commerce surface designed to feel premium on mobile and desktop.
+              </p>
             </div>
-
-            {/* CTA */}
-            <div className="hidden md:flex items-center gap-4">
-              <Link href="/dashboard" className="px-5 py-2.5 rounded-lg border border-white/10 hover:bg-white/5 transition">
-                Dashboard
-              </Link>
-
-              <Link href="/products" className="bg-indigo-600 hover:bg-indigo-500 transition px-5 py-2.5 rounded-lg shadow-lg shadow-indigo-600/20 font-medium">
-                Launch Store
-              </Link>
+            <div className="flex flex-wrap gap-3">
+              <Button asChild variant="primary">
+                <Link href="/feed">Open the feed</Link>
+              </Button>
+              <Button asChild variant="secondary">
+                <Link href="/search">Search products</Link>
+              </Button>
+              <Button asChild variant="secondary">
+                <Link href="/live">Join live</Link>
+              </Button>
             </div>
-
-            {/* MOBILE MENU BTN */}
-            <button
-              onClick={() => setMobileOpen(true)}
-              className="md:hidden bg-white/10 border border-white/10 p-2 rounded-lg"
-            >
-              ☰
-            </button>
-          </div>
-        </nav>
-
-        {/* HERO CONTENT */}
-        <section className="w-full max-w-7xl mx-auto px-6 md:px-12 lg:px-20 py-20 lg:py-28 grid lg:grid-cols-2 gap-16 items-center">
-
-          {/* LEFT */}
-          <div>
-
-            {/* BADGE */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-sm">
-              <span className="size-2 rounded-full bg-indigo-400 animate-pulse"></span>
-              AI Native Commerce Infrastructure
-            </div>
-
-            {/* HEADING */}
-            <h1 className="mt-6 text-5xl md:text-6xl font-semibold tracking-tight leading-tight">
-              Build the next generation of{" "}
-              <span className="text-indigo-400">
-                creator commerce
-              </span>{" "}
-              with AI automation
-            </h1>
-
-            {/* DESCRIPTION */}
-            <p className="mt-6 text-slate-400 text-lg leading-8 max-w-2xl">
-              Teamart helps creators, brands, and digital businesses launch
-              scalable AI-powered storefronts, automate workflows, manage users,
-              process payments, and grow revenue from one unified platform.
-            </p>
-
-            {/* CTA BUTTONS */}
-            <div className="mt-8 flex flex-wrap gap-4">
-              <Link href="/auth/signup" className="bg-indigo-600 hover:bg-indigo-500 transition px-7 py-4 rounded-xl font-medium shadow-xl shadow-indigo-600/20 inline-block">
-                Get Started
-              </Link>
-
-              <Link href="/docs" className="border border-white/10 hover:bg-white/5 transition px-7 py-4 rounded-xl inline-block">
-                View Documentation
-              </Link>
-            </div>
-
-            {/* STATS */}
-            <div className="grid grid-cols-3 gap-6 mt-12 max-w-xl">
-
-              <div>
-                <h2 className="text-3xl font-bold">10K+</h2>
-                <p className="text-slate-400 text-sm mt-1">
-                  Active Users
-                </p>
-              </div>
-
-              <div>
-                <h2 className="text-3xl font-bold">500+</h2>
-                <p className="text-slate-400 text-sm mt-1">
-                  Creator Stores
-                </p>
-              </div>
-
-              <div>
-                <h2 className="text-3xl font-bold">$2M+</h2>
-                <p className="text-slate-400 text-sm mt-1">
-                  Revenue Processed
-                </p>
-              </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[
+                { label: "Live shoppers", value: "18.4k" },
+                { label: "Active stores", value: "320" },
+                { label: "Orders today", value: "$86k" },
+              ].map((stat) => (
+                <div key={stat.label} className="rounded-[24px] bg-white px-4 py-4 shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">{stat.label}</p>
+                  <p className="mt-2 text-2xl font-semibold text-zinc-900">{stat.value}</p>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* RIGHT SIDE */}
-          <div className="relative">
-
-            {/* GLOW */}
-            <div className="absolute inset-0 bg-indigo-600/20 blur-3xl rounded-full"></div>
-
-            {/* DASHBOARD CARD */}
-            <div className="relative bg-white/5 border border-white/10 backdrop-blur-xl rounded-3xl p-6 shadow-2xl">
-
-              {/* TOP BAR */}
-              <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                <div>
-                  <h3 className="font-semibold text-lg">
-                    Analytics Dashboard
-                  </h3>
-                  <p className="text-slate-400 text-sm">
-                    Real-time commerce insights
-                  </p>
-                </div>
-
-                <div className="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full text-sm">
-                  Live
-                </div>
-              </div>
-
-              {/* METRICS */}
-              <div className="grid grid-cols-2 gap-4 mt-6">
-
-                <div className="bg-slate-900/70 rounded-2xl p-5 border border-white/5">
-                  <p className="text-slate-400 text-sm">
-                    Monthly Revenue
-                  </p>
-
-                  <h2 className="text-3xl font-bold mt-2">
-                    $48,320
-                  </h2>
-
-                  <p className="text-emerald-400 text-sm mt-2">
-                    +18.4% growth
-                  </p>
-                </div>
-
-                <div className="bg-slate-900/70 rounded-2xl p-5 border border-white/5">
-                  <p className="text-slate-400 text-sm">
-                    AI Orders
-                  </p>
-
-                  <h2 className="text-3xl font-bold mt-2">
-                    12,847
-                  </h2>
-
-                  <p className="text-indigo-400 text-sm mt-2">
-                    Automated workflows
-                  </p>
-                </div>
-
-                <div className="bg-slate-900/70 rounded-2xl p-5 border border-white/5 col-span-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-slate-400 text-sm">
-                        User Growth
-                      </p>
-
-                      <h2 className="text-3xl font-bold mt-2">
-                        +324%
-                      </h2>
-                    </div>
-
-                    <div className="h-24 w-40 rounded-xl bg-gradient-to-tr from-indigo-500/20 to-cyan-500/20 border border-white/10 flex items-end gap-2 p-3">
-                      <div className="w-4 h-10 bg-indigo-400 rounded"></div>
-                      <div className="w-4 h-16 bg-indigo-400 rounded"></div>
-                      <div className="w-4 h-12 bg-indigo-400 rounded"></div>
-                      <div className="w-4 h-20 bg-indigo-400 rounded"></div>
-                      <div className="w-4 h-14 bg-indigo-400 rounded"></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* BOTTOM USERS */}
-              <div className="mt-6 bg-slate-900/70 rounded-2xl border border-white/5 p-5">
-                <div className="flex items-center justify-between">
+          <div className="space-y-4">
+            <Card className="overflow-hidden p-0">
+              <div className="bg-zinc-950 p-4 text-white sm:p-5">
+                <div className="flex items-center justify-between gap-4">
                   <div>
-                    <h3 className="font-semibold">
-                      Registered Users
-                    </h3>
-
-                    <p className="text-slate-400 text-sm">
-                      Connected accounts across the platform
-                    </p>
+                    <p className="text-[11px] uppercase tracking-[0.2em] text-pink-200">Today’s spotlight</p>
+                    <p className="mt-2 text-lg font-semibold">Creator Collaboration Hoodie</p>
                   </div>
-
-                  <button className="text-indigo-400 text-sm hover:text-indigo-300">
-                    View All
-                  </button>
+                  <Badge tone="success">LIVE</Badge>
                 </div>
-
-                <div className="mt-4 space-y-3">
-
-                  {[
-                    "Creator Economy",
-                    "Digital Products",
-                    "Affiliate Commerce",
-                    "AI Automation",
-                  ].map((item, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="size-10 rounded-full bg-indigo-500/20 flex items-center justify-center">
-                          🚀
-                        </div>
-
-                        <div>
-                          <h4 className="font-medium">{item}</h4>
-                          <p className="text-xs text-slate-400">
-                            Active Module
-                          </p>
-                        </div>
-                      </div>
-
-                      <span className="text-emerald-400 text-sm">
-                        Online
-                      </span>
-                    </div>
-                  ))}
-
+                <p className="mt-3 text-sm leading-6 text-white/85">
+                  A premium drop with bundle incentives, fast purchase paths, and creator-first storytelling built for social conversion.
+                </p>
+              </div>
+              <div className="grid gap-3 p-4 sm:grid-cols-2 sm:p-5">
+                <div className="rounded-[24px] bg-[#FFF8FB] p-4">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">Revenue</p>
+                  <p className="mt-2 text-2xl font-semibold text-zinc-900">$12.4k</p>
+                </div>
+                <div className="rounded-[24px] bg-[#FFF8FB] p-4">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">Conversion</p>
+                  <p className="mt-2 text-2xl font-semibold text-zinc-900">8.2%</p>
                 </div>
               </div>
+            </Card>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Card className="p-4">
+                <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">Social pulse</p>
+                <p className="mt-3 text-lg font-semibold text-zinc-900">37 creator moments</p>
+                <p className="mt-2 text-sm leading-6 text-zinc-600">Fresh social content is surfaced in one clean scrollable experience.</p>
+              </Card>
+              <Card className="p-4">
+                <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">Merchant tools</p>
+                <p className="mt-3 text-lg font-semibold text-zinc-900">24 live offers</p>
+                <p className="mt-2 text-sm leading-6 text-zinc-600">Promos, inventory, and product performance are all ready for professional merchandising.</p>
+              </Card>
             </div>
           </div>
-        </section>
-      </header>
-    </>
-  );
-}
-            Deploy Now
-          </a >
-  <a
-    className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-    href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-    target="_blank"
-    rel="noopener noreferrer"
-  >
-    Documentation
-  </a>
-        </div >
-      </main >
-    </div >
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <SectionHeader
+          title="Browse by category"
+          description="Jump into the most active shopping spaces without leaving a premium, social-first experience."
+        />
+        <div className="flex flex-wrap gap-2">
+          {categories.map((category) => (
+            <Link
+              key={category}
+              href="/search"
+              className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700"
+            >
+              {category}
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[1fr_0.9fr]">
+        <div className="space-y-4">
+          <SectionHeader
+            title="For your next scroll"
+            description="A curated slice of creator drops, merchant promos, and commerce-first moments styled for a premium social feed."
+          />
+          <div className="grid gap-4 md:grid-cols-2">
+            {feedItems.slice(0, 2).map((item) => (
+              <FeedCard key={item.id} item={item} />
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <Card className="p-5">
+            <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">Recommended stores</p>
+            <div className="mt-3 space-y-3">
+              {stores.slice(0, 4).map((store) => (
+                <Link key={store.slug} href={`/stores/${store.slug}`} className="block rounded-[24px] bg-[#FFF8FB] p-3">
+                  <p className="text-sm font-semibold text-zinc-900">{store.name}</p>
+                  <p className="mt-1 text-xs text-zinc-600">{store.category} • {store.live}</p>
+                </Link>
+              ))}
+            </div>
+          </Card>
+
+          <Card className="p-5">
+            <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">Creator spotlight</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {creators.map((creator) => (
+                <Link key={creator.id} href={`/creator/${creator.id}`} className="rounded-[24px] bg-zinc-50 p-3">
+                  <p className="text-sm font-semibold text-zinc-900">{creator.name}</p>
+                  <p className="mt-1 text-xs text-zinc-500">{creator.followers}</p>
+                </Link>
+              ))}
+            </div>
+          </Card>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <SectionHeader
+          title="Trending products"
+          description="A polished catalog slice with creator favorites and social-ready commerce picks."
+        />
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          {products.slice(0, 6).map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </div>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+        <Card className="p-5">
+          <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">Live commerce</p>
+          <h2 className="mt-3 text-[22px] font-semibold text-zinc-900">Keep every drop and promotion conversion-ready</h2>
+          <p className="mt-2 text-sm leading-7 text-zinc-600">
+            Merge creator storytelling, merchant merchandising, and live shopping prompts into one premium commercial surface that helps shoppers move from discovery to checkout with less friction.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Button asChild variant="primary">
+              <Link href="/creator/studio">Open creator studio</Link>
+            </Button>
+            <Button asChild variant="secondary">
+              <Link href="/merchant">Open merchant workspace</Link>
+            </Button>
+          </div>
+        </Card>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          {recommendedProducts.slice(0, 4).map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </div>
+      </section>
+    </div>
   );
 }
