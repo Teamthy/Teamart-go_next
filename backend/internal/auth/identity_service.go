@@ -343,6 +343,36 @@ func (is *IdentityService) ChangePassword(ctx context.Context, input *ChangePass
 	return nil
 }
 
+// UpdatePasswordHashInput represents input for updating a stored password hash
+// The service hashes the plain password before persisting it.
+type UpdatePasswordHashInput struct {
+	UserID      int64
+	NewPassword string
+}
+
+// UpdatePasswordHash updates a user's password hash from a plain password.
+func (is *IdentityService) UpdatePasswordHash(ctx context.Context, input *UpdatePasswordHashInput) error {
+	if input.UserID == 0 {
+		return fmt.Errorf("user ID is required")
+	}
+	if input.NewPassword == "" {
+		return fmt.Errorf("new password is required")
+	}
+
+	if err := is.validatePasswordStrength(input.NewPassword); err != nil {
+		return err
+	}
+
+	newPasswordHash := is.hashPassword(input.NewPassword)
+	if err := is.repo.UpdatePasswordHash(ctx, input.UserID, newPasswordHash); err != nil {
+		is.logger.Errorf("failed to update password hash for user %d: %v", input.UserID, err)
+		return fmt.Errorf("failed to update password: %w", err)
+	}
+
+	is.logger.Infof("updated password hash for user %d", input.UserID)
+	return nil
+}
+
 // GetIdentityStatusInput represents input for checking identity status
 type GetIdentityStatusInput struct {
 	UserID int64

@@ -3,7 +3,9 @@ package orders
 import (
 	"context"
 	"fmt"
+	"strconv"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/teamart/commerce-api/internal/infra/queries"
 	"github.com/teamart/commerce-api/pkg/logger"
 )
@@ -53,22 +55,25 @@ func (s *Service) CreateOrder(ctx context.Context, input *CreateOrderInput) (*Cr
 
 	s.logger.Debugf("creating order for user: %d with amount: %.2f", input.UserID, input.TotalAmount)
 
-	order, err := s.queries.CreateOrder(ctx, queries.CreateOrderParams{
-		UserID:      input.UserID,
-		TotalAmount: input.TotalAmount,
-		Status:      input.Status,
-	})
+	totalAmount := strconv.FormatFloat(input.TotalAmount, 'f', -1, 64)
+	order, err := s.queries.CreateOrder(ctx, int32(input.UserID), totalAmount, input.Status)
 	if err != nil {
 		s.logger.Errorf("failed to create order: %v", err)
 		return nil, fmt.Errorf("failed to create order: %w", err)
 	}
 
+	totalAmountValue, err := numericToFloat64(order.TotalAmount)
+	if err != nil {
+		s.logger.Errorf("failed to parse order total amount: %v", err)
+		return nil, fmt.Errorf("failed to parse order total amount: %w", err)
+	}
+
 	s.logger.Infof("order created successfully with ID: %d", order.ID)
 
 	return &CreateOrderOutput{
-		ID:          order.ID,
-		UserID:      order.UserID,
-		TotalAmount: order.TotalAmount,
+		ID:          int64(order.ID),
+		UserID:      int64(order.UserID),
+		TotalAmount: totalAmountValue,
 		Status:      order.Status,
 		CreatedAt:   order.CreatedAt.String(),
 		UpdatedAt:   order.UpdatedAt.String(),
@@ -98,16 +103,22 @@ func (s *Service) GetOrderByID(ctx context.Context, input *GetOrderByIDInput) (*
 
 	s.logger.Debugf("fetching order with ID: %d", input.OrderID)
 
-	order, err := s.queries.GetOrderByID(ctx, input.OrderID)
+	order, err := s.queries.GetOrderByID(ctx, int32(input.OrderID))
 	if err != nil {
 		s.logger.Errorf("failed to fetch order: %v", err)
 		return nil, fmt.Errorf("failed to fetch order: %w", err)
 	}
 
+	totalAmountValue, err := numericToFloat64(order.TotalAmount)
+	if err != nil {
+		s.logger.Errorf("failed to parse order total amount: %v", err)
+		return nil, fmt.Errorf("failed to parse order total amount: %w", err)
+	}
+
 	return &GetOrderByIDOutput{
-		ID:          order.ID,
-		UserID:      order.UserID,
-		TotalAmount: order.TotalAmount,
+		ID:          int64(order.ID),
+		UserID:      int64(order.UserID),
+		TotalAmount: totalAmountValue,
 		Status:      order.Status,
 		CreatedAt:   order.CreatedAt.String(),
 		UpdatedAt:   order.UpdatedAt.String(),
@@ -151,11 +162,7 @@ func (s *Service) ListOrdersByUserID(ctx context.Context, input *ListOrdersByUse
 
 	s.logger.Debugf("listing orders for user: %d with limit: %d, offset: %d", input.UserID, input.Limit, input.Offset)
 
-	orders, err := s.queries.ListOrdersByUserID(ctx, queries.ListOrdersByUserIDParams{
-		UserID: input.UserID,
-		Limit:  input.Limit,
-		Offset: input.Offset,
-	})
+	orders, err := s.queries.ListOrdersByUserID(ctx, int32(input.UserID), input.Limit, input.Offset)
 	if err != nil {
 		s.logger.Errorf("failed to list orders: %v", err)
 		return nil, fmt.Errorf("failed to list orders: %w", err)
@@ -168,10 +175,14 @@ func (s *Service) ListOrdersByUserID(ctx context.Context, input *ListOrdersByUse
 	}
 
 	for i, order := range orders {
+		totalAmountValue, err := numericToFloat64(order.TotalAmount)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse order total amount: %w", err)
+		}
 		output.Orders[i] = OrderData{
-			ID:          order.ID,
-			UserID:      order.UserID,
-			TotalAmount: order.TotalAmount,
+			ID:          int64(order.ID),
+			UserID:      int64(order.UserID),
+			TotalAmount: totalAmountValue,
 			Status:      order.Status,
 			CreatedAt:   order.CreatedAt.String(),
 			UpdatedAt:   order.UpdatedAt.String(),
@@ -204,11 +215,7 @@ func (s *Service) ListOrdersByStatus(ctx context.Context, input *ListOrdersBySta
 
 	s.logger.Debugf("listing orders with status: %s", input.Status)
 
-	orders, err := s.queries.ListOrdersByStatus(ctx, queries.ListOrdersByStatusParams{
-		Status: input.Status,
-		Limit:  input.Limit,
-		Offset: input.Offset,
-	})
+	orders, err := s.queries.ListOrdersByStatus(ctx, input.Status, input.Limit, input.Offset)
 	if err != nil {
 		s.logger.Errorf("failed to list orders: %v", err)
 		return nil, fmt.Errorf("failed to list orders: %w", err)
@@ -221,10 +228,14 @@ func (s *Service) ListOrdersByStatus(ctx context.Context, input *ListOrdersBySta
 	}
 
 	for i, order := range orders {
+		totalAmountValue, err := numericToFloat64(order.TotalAmount)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse order total amount: %w", err)
+		}
 		output.Orders[i] = OrderData{
-			ID:          order.ID,
-			UserID:      order.UserID,
-			TotalAmount: order.TotalAmount,
+			ID:          int64(order.ID),
+			UserID:      int64(order.UserID),
+			TotalAmount: totalAmountValue,
 			Status:      order.Status,
 			CreatedAt:   order.CreatedAt.String(),
 			UpdatedAt:   order.UpdatedAt.String(),
@@ -253,10 +264,7 @@ func (s *Service) ListAllOrders(ctx context.Context, input *ListAllOrdersInput) 
 
 	s.logger.Debugf("listing all orders with limit: %d, offset: %d", input.Limit, input.Offset)
 
-	orders, err := s.queries.ListAllOrders(ctx, queries.ListAllOrdersParams{
-		Limit:  input.Limit,
-		Offset: input.Offset,
-	})
+	orders, err := s.queries.ListAllOrders(ctx, input.Limit, input.Offset)
 	if err != nil {
 		s.logger.Errorf("failed to list orders: %v", err)
 		return nil, fmt.Errorf("failed to list orders: %w", err)
@@ -269,10 +277,14 @@ func (s *Service) ListAllOrders(ctx context.Context, input *ListAllOrdersInput) 
 	}
 
 	for i, order := range orders {
+		totalAmountValue, err := numericToFloat64(order.TotalAmount)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse order total amount: %w", err)
+		}
 		output.Orders[i] = OrderData{
-			ID:          order.ID,
-			UserID:      order.UserID,
-			TotalAmount: order.TotalAmount,
+			ID:          int64(order.ID),
+			UserID:      int64(order.UserID),
+			TotalAmount: totalAmountValue,
 			Status:      order.Status,
 			CreatedAt:   order.CreatedAt.String(),
 			UpdatedAt:   order.UpdatedAt.String(),
@@ -282,4 +294,12 @@ func (s *Service) ListAllOrders(ctx context.Context, input *ListAllOrdersInput) 
 	s.logger.Infof("fetched %d orders", len(orders))
 
 	return output, nil
+}
+
+func numericToFloat64(value pgtype.Numeric) (float64, error) {
+	floatValue, err := value.Float64Value()
+	if err != nil {
+		return 0, err
+	}
+	return floatValue.Float64, nil
 }

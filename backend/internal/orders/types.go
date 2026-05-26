@@ -249,19 +249,6 @@ type UpdateCartItemInput struct {
 	Quantity   int64
 }
 
-// CreateOrderInput represents the input for creating an order
-type CreateOrderInput struct {
-	UserID          int64
-	Source          string
-	CreatorID       *int64
-	CustomerEmail   string
-	CustomerPhone   *string
-	ShippingAddress map[string]interface{}
-	BillingAddress  map[string]interface{}
-	ShippingMethod  string
-	CouponCode      *string
-}
-
 // UpdateOrderStatusInput represents the input for updating order status
 type UpdateOrderStatusInput struct {
 	Status string

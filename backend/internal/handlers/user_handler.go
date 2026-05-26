@@ -292,7 +292,7 @@ func (h *UserHandler) HandleDeleteUser(w http.ResponseWriter, r *http.Request) {
 }
 
 // RegisterUserRoutes registers all user-related routes
-func RegisterUserRoutes(mux *http.ServeMux, handler *UserHandler) {
+func RegisterUserRoutes(mux Router, handler *UserHandler) {
 	// User endpoints
 	mux.HandleFunc("POST /users", handler.HandleCreateUser)
 	mux.HandleFunc("GET /users", handler.HandleListUsers)

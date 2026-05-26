@@ -61,7 +61,18 @@ func (h *AdminHandler) ApprovePayout(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing id", http.StatusBadRequest)
 		return
 	}
-	if err := h.svc.ApprovePayout(context.Background(), id); err != nil {
+
+	approverID := int64(0)
+	if v := q.Get("approver_id"); v != "" {
+		parsed, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			http.Error(w, "invalid approver_id", http.StatusBadRequest)
+			return
+		}
+		approverID = parsed
+	}
+
+	if err := h.svc.ApprovePayout(context.Background(), id, approverID); err != nil {
 		h.log.Errorf("approve payout: %v", err)
 		http.Error(w, "failed", http.StatusInternalServerError)
 		return

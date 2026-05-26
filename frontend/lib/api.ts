@@ -1,5 +1,70 @@
 export const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
+type AuthUser = {
+    id: number;
+    email: string;
+    name?: string;
+    role?: string;
+    created_at?: string;
+};
+
+type AuthSessionResponse = {
+    user_id?: number;
+    session_id?: string;
+    email?: string;
+    status?: string;
+    created_at?: string;
+    access_token?: string;
+    refresh_token?: string;
+    requires_mfa?: boolean;
+    requiresMFA?: boolean;
+    requires_password_verification?: boolean;
+    requiresPassword?: boolean;
+    user?: Partial<AuthUser>;
+};
+
+function getStoredAuthUser() {
+    if (typeof window === "undefined") {
+        return null;
+    }
+
+    try {
+        const raw = localStorage.getItem("user");
+        if (!raw) {
+            return null;
+        }
+
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== "object") {
+            return null;
+        }
+
+        return parsed as AuthUser;
+    } catch {
+        return null;
+    }
+}
+
+function normalizeAuthUser(data: AuthSessionResponse): AuthUser {
+    const fallbackUser = getStoredAuthUser();
+    const email = data.email || fallbackUser?.email || "";
+
+    return {
+        id: Number(data.user_id ?? data.user?.id ?? fallbackUser?.id ?? 0),
+        email,
+        name: data.user?.name || fallbackUser?.name || email.split("@")[0] || "Customer",
+        role: data.user?.role || fallbackUser?.role || "customer",
+        created_at: data.created_at || data.user?.created_at || fallbackUser?.created_at,
+    };
+}
+
+function normalizeAuthResponse(data: AuthSessionResponse) {
+    return {
+        ...data,
+        user: normalizeAuthUser(data),
+    };
+}
+
 // Rate limit tracking
 let rateLimitRemaining = 1000;
 let rateLimitReset: number | null = null;
@@ -245,23 +310,38 @@ export function getRateLimitInfo() {
 // =============== AUTH ENDPOINTS ===============
 
 export async function login(email: string, password: string) {
-    return request("/auth/login", {
+    const response = await request("/auth/login", {
         method: "POST",
         body: { email, password, user_agent: navigator.userAgent, ip_address: "0.0.0.0" },
     });
+
+    return normalizeAuthResponse(response);
 }
 
 export async function signup(email: string, password: string) {
-    return request("/auth/signup", {
+    const response = await request("/auth/signup", {
         method: "POST",
         body: { email, password },
     });
+
+    return normalizeAuthResponse(response);
 }
 
 export async function verifyOTP(session_id: string, code: string) {
-    return request("/auth/verify-otp", {
+    const response = await request("/sessions/validate", {
         method: "POST",
-        body: { session_id, code },
+        body: {
+            session_id,
+            user_agent: navigator.userAgent,
+            ip_address: "0.0.0.0",
+        },
+    });
+
+    return normalizeAuthResponse({
+        ...response,
+        user_id: response.user_id,
+        session_id: response.session_id || session_id,
+        email: getStoredAuthUser()?.email || response.email,
     });
 }
 
@@ -341,9 +421,25 @@ export async function deleteProduct(productId: number) {
 // =============== ORDER ENDPOINTS ===============
 
 export async function createOrder(data: any) {
+    const storedUser = getStoredAuthUser();
+    const user_id = Number(data?.user_id ?? storedUser?.id ?? 0);
+
+    if (!user_id) {
+        throw new Error("Please sign in to place an order.");
+    }
+
+    const total_amount = Number(data?.total_amount ?? data?.totalAmount ?? 0);
+    if (!Number.isFinite(total_amount) || total_amount <= 0) {
+        throw new Error("Your cart is empty. Add products before checkout.");
+    }
+
     return request("/orders", {
         method: "POST",
-        body: data,
+        body: {
+            user_id,
+            total_amount,
+            status: data?.status || "pending",
+        },
     });
 }
 

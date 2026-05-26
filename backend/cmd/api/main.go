@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
@@ -88,7 +89,7 @@ func main() {
 	log.Infof("initializing SQLC queries")
 	q := queries.New(db)
 
-	authConfig := createAuthConfig()
+	authConfig := createAuthConfig(cfg)
 
 	moderationService := moderation.NewService(nil)
 	analyticsService := analytics.NewService()
@@ -125,6 +126,27 @@ func main() {
 	if err := application.Run(handler); err != nil {
 		log.Errorf("application error: %v", err)
 		os.Exit(1)
+	}
+}
+
+func createAuthConfig(cfg *config.Config) *auth.AuthConfig {
+	return &auth.AuthConfig{
+		JWTSecret:                 cfg.JWT.Secret,
+		JWTAccessTokenTTL:         cfg.JWT.AccessTokenExpiry,
+		JWTRefreshTokenTTL:        cfg.JWT.RefreshTokenExpiry,
+		JWTEmailTokenTTL:          24 * time.Hour,
+		JWTPasswordResetTTL:       1 * time.Hour,
+		OTPLength:                 6,
+		OTPTTL:                    10 * time.Minute,
+		OTPMaxAttempts:            5,
+		SessionTTL:                24 * time.Hour,
+		SessionIdleTimeout:        30 * time.Minute,
+		MaxLoginAttempts:          5,
+		LoginAttemptWindow:        15 * time.Minute,
+		PasswordMinLength:         8,
+		PasswordRequireSpecial:    true,
+		PasswordRequireNumbers:    true,
+		RequireDeviceVerification: true,
 	}
 }
 

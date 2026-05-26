@@ -72,6 +72,17 @@ type LoggerConfig struct {
 	EnableJSON bool
 }
 
+type AdaptiveProfile struct {
+	Resolution   string
+	Bitrate      string
+	AudioBitrate string
+}
+
+type StreamingConfig struct {
+	HLSBaseURL         string
+	MasterPlaylistName string
+}
+
 // Load loads configuration from environment variables with defaults
 func Load() (*Config, error) {
 	return &Config{

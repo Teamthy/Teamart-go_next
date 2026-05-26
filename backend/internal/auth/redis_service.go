@@ -69,6 +69,37 @@ func (rs *RedisService) DeleteOTP(ctx context.Context, email string) error {
 	return nil
 }
 
+// SetValue stores a generic string value in Redis with TTL.
+func (rs *RedisService) SetValue(ctx context.Context, key string, value string, ttl time.Duration) error {
+	if err := rs.client.Set(ctx, key, value, ttl).Err(); err != nil {
+		rs.logger.Errorf("failed to store redis value %s: %v", key, err)
+		return err
+	}
+	return nil
+}
+
+// GetValue retrieves a generic string value from Redis.
+func (rs *RedisService) GetValue(ctx context.Context, key string) (string, error) {
+	value, err := rs.client.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return "", fmt.Errorf("redis key not found: %s", key)
+	}
+	if err != nil {
+		rs.logger.Errorf("failed to read redis value %s: %v", key, err)
+		return "", err
+	}
+	return value, nil
+}
+
+// DeleteValue deletes a generic key from Redis.
+func (rs *RedisService) DeleteValue(ctx context.Context, key string) error {
+	if err := rs.client.Del(ctx, key).Err(); err != nil {
+		rs.logger.Errorf("failed to delete redis value %s: %v", key, err)
+		return err
+	}
+	return nil
+}
+
 // ===== OTP Attempt Tracking =====
 
 // IncrementOTPAttempts increments OTP attempt counter

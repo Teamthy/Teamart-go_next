@@ -46,7 +46,7 @@ export default function ProductCard({ product }: { product: ProductCardProduct }
                     href={`/products/${product.id}`}
                     className="inline-flex items-center rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
                 >
-                    View details
+                    Shop now
                 </Link>
             </div>
         </article>

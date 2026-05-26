@@ -19,7 +19,10 @@ func NewHandler(service *ModerationService, logger *logger.Logger) *Handler {
 	return &Handler{service: service, logger: logger}
 }
 
-func RegisterModerationRoutes(mux *http.ServeMux, handler *Handler) {
+func RegisterModerationRoutes(mux interface {
+	HandleFunc(string, func(http.ResponseWriter, *http.Request))
+	Handle(string, http.Handler)
+}, handler *Handler) {
 	mux.HandleFunc("/api/v1/moderation/users", handler.handleUsers)
 	mux.HandleFunc("/api/v1/moderation/users/", handler.handleUser)
 }

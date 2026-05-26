@@ -46,9 +46,11 @@ func SetupHandlers(
 	// Create auth services
 	identityService := auth.NewIdentityService(authConfig, log, identityRepo)
 	sessionService := auth.NewSessionService(authConfig, log, sessionRepo)
+	tokenService := auth.NewTokenService(authConfig, log)
+	redisService := auth.NewRedisService(nil, log)
 
 	// Create auth handlers
-	authHandler := NewAuthHandler(identityService, sessionService, log)
+	authHandler := NewAuthHandler(identityService, sessionService, tokenService, redisService, log)
 	sessionHandler := NewSessionHandler(sessionService, log)
 
 	// Register auth routes
@@ -81,7 +83,7 @@ func SetupHandlers(
 	RegisterTenantRoutes(mux, tenantHandler)
 
 	moderationHandler := moderation.NewHandler(moderationService, log)
-	RegisterModerationRoutes(mux, moderationHandler)
+	moderation.RegisterModerationRoutes(mux, moderationHandler)
 
 	analyticsHandler := analytics.NewHandler(analyticsService, log)
 	analytics.RegisterAnalyticsRoutes(mux, analyticsHandler)

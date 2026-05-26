@@ -1,8 +1,15 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import Illustration from "@/components/social/Illustration";
+import Badge from "@/components/ui/badge";
+import Button from "@/components/ui/button";
+import Card from "@/components/ui/card";
+import Input from "@/components/ui/input";
 import * as api from "@/lib/api";
+import { getStoredCustomer, saveCustomer } from "@/lib/auth-state";
 
 type AuthVariant = "login" | "register" | "mfa";
 
@@ -99,10 +106,27 @@ function persistAuthResponse(response: any) {
 export default function AuthTemplate({ variant = "login" }: { variant?: AuthVariant }) {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
     const [otp, setOtp] = useState("");
     const [remember, setRemember] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [step, setStep] = useState(0);
+    const [resetSent, setResetSent] = useState(false);
+    const [passwordUpdated, setPasswordUpdated] = useState(false);
+    const [currentVariant, setCurrentVariant] = useState<AuthVariant>(variant);
+    const [selectedRole, setSelectedRole] = useState<AuthRole>(defaultRole);
+    const [signupStep, setSignupStep] = useState(1);
+    const [customerFirstName, setCustomerFirstName] = useState("");
+    const [customerLastName, setCustomerLastName] = useState("");
+    const [customerFavoriteCategory, setCustomerFavoriteCategory] = useState("");
+    const [creatorName, setCreatorName] = useState("");
+    const [creatorNiche, setCreatorNiche] = useState("");
+    const [creatorHandle, setCreatorHandle] = useState("");
+    const [merchantOwnerName, setMerchantOwnerName] = useState("");
+    const [merchantStoreName, setMerchantStoreName] = useState("");
+    const [merchantCategory, setMerchantCategory] = useState("");
+    const [merchantWebsite, setMerchantWebsite] = useState("");
     const router = useRouter();
 
     const currentState = stateConfig[variant];
@@ -115,7 +139,9 @@ export default function AuthTemplate({ variant = "login" }: { variant?: AuthVari
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
-        setLoading(true);
+        setResetSent(false);
+        setPasswordUpdated(false);
+    };
 
         try {
             if (variant === "mfa") {
@@ -131,7 +157,69 @@ export default function AuthTemplate({ variant = "login" }: { variant?: AuthVari
                 return;
             }
 
-            if (variant === "login") {
+            setPasswordUpdated(true);
+            return;
+        }
+
+        if (currentVariant === "register") {
+            try {
+                if (signupStep === 1) {
+                    validateStepOne();
+                    setSignupStep(2);
+                    return;
+                }
+
+                if (signupStep === 2) {
+                    validateStepTwo();
+                    setSignupStep(3);
+                    return;
+                }
+
+                const signupResponse = await api.signup(email, password);
+                const loginResponse = await api.login(email, password);
+
+                persistAuthSession(loginResponse, selectedRole);
+                localStorage.setItem(
+                    "onboarding_profile",
+                    JSON.stringify({
+                        role: selectedRole,
+                        email,
+                        name: signupName,
+                        createdAt: new Date().toISOString(),
+                    })
+                );
+                sessionStorage.setItem(
+                    "signupResult",
+                    JSON.stringify({
+                        ...signupResponse,
+                        user: {
+                            ...signupResponse.user,
+                            role: selectedRole,
+                            name: signupName,
+                        },
+                    })
+                );
+
+                router.push(getRoleDestination(selectedRole));
+                return;
+            } catch (err: unknown) {
+                setError(err instanceof Error ? err.message : "Request failed");
+                return;
+            }
+        }
+
+        if (currentVariant === "login") {
+            if (selectedRole !== "customer" && !getStoredCustomer()) {
+                setError("Create a customer account first to unlock creator or merchant access.");
+                setSelectedRole("customer");
+                resetRegisterFlow();
+                goToVariant("register");
+                return;
+            }
+
+            setLoading(true);
+
+            try {
                 const res = await api.login(email, password);
                 persistAuthResponse(res);
                 sessionStorage.setItem("session", JSON.stringify(res));
@@ -201,34 +289,87 @@ export default function AuthTemplate({ variant = "login" }: { variant?: AuthVari
                                 <p className="w-full text-nowrap text-sm text-gray-500/90">or sign in with email</p>
                                 <div className="w-full h-px bg-gray-300/90" />
                             </div>
+                            <Badge tone="default">Step {signupStep} of 3</Badge>
+                        </div>
+                        <div className="mt-3">
+                            <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">{signupRequirements[selectedRole].title}</p>
+                            <ul className="mt-2 space-y-1 text-sm text-zinc-700">
+                                {signupRequirements[selectedRole].details.map((item) => (
+                                    <li key={item}>• {item}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+                ) : null}
 
-                            <div className="flex items-center w-full bg-transparent border border-gray-300/60 h-12 rounded-full overflow-hidden pl-6 gap-2">
-                                <svg width="16" height="11" viewBox="0 0 16 11" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path fillRule="evenodd" clipRule="evenodd" d="M0 .55.571 0H15.43l.57.55v9.9l-.571.55H.57L0 10.45zm1.143 1.138V9.9h13.714V1.69l-6.503 4.8h-.697zM13.749 1.1H2.25L8 5.356z" fill="#6B7280" />
-                                </svg>
-                                <input
-                                    type="email"
-                                    placeholder="Email id"
-                                    className="bg-transparent text-gray-500/80 placeholder-gray-500/80 outline-none text-sm w-full h-full"
-                                    required
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                />
-                            </div>
+                {error ? (
+                    <div className="mt-4 rounded-[24px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                        {error}
+                    </div>
+                ) : null}
 
-                            <div className="flex items-center mt-6 w-full bg-transparent border border-gray-300/60 h-12 rounded-full overflow-hidden pl-6 gap-2">
-                                <svg width="13" height="17" viewBox="0 0 13 17" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M13 8.5c0-.938-.729-1.7-1.625-1.7h-.812V4.25C10.563 1.907 8.74 0 6.5 0S2.438 1.907 2.438 4.25V6.8h-.813C.729 6.8 0 7.562 0 8.5v6.8c0 .938.729 1.7 1.625 1.7h9.75c.896 0 1.625-.762 1.625-1.7zM4.063 4.25c0-1.406 1.093-2.55 2.437-2.55s2.438 1.144 2.438 2.55V6.8H4.061z" fill="#6B7280" />
-                                </svg>
-                                <input
-                                    type="password"
-                                    placeholder="Password"
-                                    className="bg-transparent text-gray-500/80 placeholder-gray-500/80 outline-none text-sm w-full h-full"
-                                    required
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                />
+                {resetSent ? (
+                    <div className="mt-4 rounded-[24px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                        A reset link has been sent to your inbox.
+                    </div>
+                ) : null}
+
+                {passwordUpdated ? (
+                    <div className="mt-4 rounded-[24px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                        Your password has been updated. You can sign in now.
+                    </div>
+                ) : null}
+
+                <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+                    {currentVariant === "register" ? (
+                        <>
+                            {signupStep === 1 ? renderRegisterFields() : null}
+                            {signupStep === 2 ? (
+                                <>
+                                    <Input
+                                        label="Password"
+                                        type="password"
+                                        placeholder="Create a secure password"
+                                        required
+                                        value={password}
+                                        onChange={(event) => setPassword(event.target.value)}
+                                    />
+                                    <Input
+                                        label="Confirm password"
+                                        type="password"
+                                        placeholder="Confirm your password"
+                                        required
+                                        value={confirmPassword}
+                                        onChange={(event) => setConfirmPassword(event.target.value)}
+                                    />
+                                </>
+                            ) : null}
+                            {signupStep === 3 ? renderRegisterSummary() : null}
+                            <div className="flex flex-wrap gap-3">
+                                {signupStep > 1 ? (
+                                    <Button
+                                        type="button"
+                                        variant="secondary"
+                                        className="flex-1"
+                                        onClick={() => setSignupStep((value) => Math.max(1, value - 1))}
+                                    >
+                                        Back
+                                    </Button>
+                                ) : null}
+                                <Button type="submit" variant="primary" className="flex-1">
+                                    {signupStep === 1
+                                        ? "Continue"
+                                        : signupStep === 2
+                                            ? "Review details"
+                                            : "Create account"}
+                                </Button>
                             </div>
+                        </>
+                    ) : currentVariant === "login" ? (
+                        <>
+                            <div className="grid gap-3">
+                                {roleOptions.map((option) => {
+                                    const active = option.value === selectedRole;
 
                             <div className="w-full flex items-center justify-between mt-8 text-gray-500/80">
                                 <div className="flex items-center gap-2">
@@ -250,9 +391,7 @@ export default function AuthTemplate({ variant = "login" }: { variant?: AuthVari
                                 {footerPrompt} <button type="button" className="text-indigo-400 hover:underline" onClick={() => router.push(footerLink)}>{footerCta}</button>
                             </p>
                         </>
-                    )}
-
-                    {variant === "mfa" && (
+                    ) : currentVariant === "forgot" ? (
                         <>
                             <div className="flex items-center w-full bg-transparent border border-gray-300/60 h-12 rounded-full overflow-hidden pl-6 gap-2">
                                 <input
@@ -271,7 +410,54 @@ export default function AuthTemplate({ variant = "login" }: { variant?: AuthVari
                         </>
                     )}
                 </form>
-            </div>
+
+                {currentVariant === "login" || currentVariant === "register" ? (
+                    <div className="mt-4 flex flex-wrap gap-3">
+                        <SocialButton icon="G" label="Google" onClick={() => persistSocialAuth("google")} />
+                        <SocialButton icon="" label="Apple" onClick={() => persistSocialAuth("apple")} />
+                        <SocialButton icon="♪" label="TikTok" onClick={() => persistSocialAuth("tiktok")} />
+                    </div>
+                ) : null}
+
+                <div className="mt-5 text-center text-sm text-zinc-600">
+                    {currentVariant === "login" ? (
+                        <>
+                            New here? <button type="button" onClick={() => goToVariant("register")} className="font-semibold text-[#E91E63]">Create an account</button>
+                        </>
+                    ) : currentVariant === "register" ? (
+                        <>
+                            Already have an account? <button type="button" onClick={() => goToVariant("login")} className="font-semibold text-[#E91E63]">Sign in instead</button>
+                        </>
+                    ) : currentVariant === "forgot" ? (
+                        <>
+                            Remembered your password? <button type="button" onClick={() => goToVariant("login")} className="font-semibold text-[#E91E63]">Back to login</button>
+                        </>
+                    ) : currentVariant === "reset" ? (
+                        <>
+                            Need a new code? <Link href="/auth/forgot-password" className="font-semibold text-[#E91E63]">Request reset link</Link>
+                        </>
+                    ) : currentVariant === "mfa" ? (
+                        <>
+                            Need a new code? <button type="button" onClick={() => goToVariant("login")} className="font-semibold text-[#E91E63]">Back to sign in</button>
+                        </>
+                    ) : null}
+                </div>
+
+                {currentVariant === "register" ? (
+                    <div className="mt-4 text-center">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                resetRegisterFlow();
+                                goToVariant("onboarding");
+                            }}
+                            className="text-sm font-semibold text-[#E91E63]"
+                        >
+                            Pick a different role
+                        </button>
+                    </div>
+                ) : null}
+            </Card>
         </div>
     );
 }
