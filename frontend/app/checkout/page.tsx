@@ -126,14 +126,39 @@ export default function CheckoutPage() {
                             <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Shipping details</p>
                             <h2 className="mt-2 text-xl font-semibold text-slate-900">Where should it go?</h2>
                         </div>
+
+                        <input
+                            type="text"
+                            name="cardNumber"
+                            value={formData.cardNumber}
+                            onChange={handleChange}
+                            required
+                            className="w-full rounded-3xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-3 text-sm text-slate-900 dark:text-white placeholder-slate-600 dark:placeholder-slate-400"
+                            placeholder="Card number"
+                            maxLength={19}
+                        />
+
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <Input label="Full name" name="fullName" value={formData.fullName} onChange={handleChange} required />
-                            <Input label="Phone" name="phone" type="tel" value={formData.phone} onChange={handleChange} required />
-                        </div>
-                        <Input label="Street address" name="address" value={formData.address} onChange={handleChange} required />
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <Input label="City" name="city" value={formData.city} onChange={handleChange} required />
-                            <Input label="Postal code" name="postalCode" value={formData.postalCode} onChange={handleChange} required />
+                            <input
+                                type="text"
+                                name="expiryDate"
+                                value={formData.expiryDate}
+                                onChange={handleChange}
+                                required
+                                className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-3 text-sm text-slate-900 dark:text-white placeholder-slate-600 dark:placeholder-slate-400"
+                                placeholder="MM / YY"
+                                maxLength={5}
+                            />
+                            <input
+                                type="text"
+                                name="cvc"
+                                value={formData.cvc}
+                                onChange={handleChange}
+                                required
+                                className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-3 text-sm text-slate-900 dark:text-white placeholder-slate-600 dark:placeholder-slate-400"
+                                placeholder="CVC"
+                                maxLength={3}
+                            />
                         </div>
 
                         <div className="pt-2">

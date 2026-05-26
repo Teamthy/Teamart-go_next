@@ -1,1 +1,1 @@
-export { default } from "./order/CartSummary";
+export { default } from "@/components/order/CartSummary";

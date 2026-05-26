@@ -1,1 +1,1 @@
-export { default } from "./auth/AuthTemplate";
+export { default } from "@/components/auth/AuthTemplate";
