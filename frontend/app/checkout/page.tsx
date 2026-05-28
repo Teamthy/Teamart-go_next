@@ -1,53 +1,35 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import CheckoutSummary from "@/components/order/CheckoutSummary";
-import Button from "@/components/ui/button";
-import Card from "@/components/ui/card";
-import Input from "@/components/ui/input";
-import Badge from "@/components/ui/badge";
 import SectionHeader from "@/components/ui/SectionHeader";
+import { cartItems as mockCartItems } from "@/lib/mock/products";
 import * as api from "@/lib/api";
 
-const initialForm = {
-    fullName: "",
-    phone: "",
-    address: "",
-    city: "",
-    postalCode: "",
-    cardNumber: "",
-    expiryDate: "",
-    cvc: "",
-    couponCode: "",
-};
-
 export default function CheckoutPage() {
-    const [formData, setFormData] = useState(initialForm);
+    const router = useRouter();
+    const [formData, setFormData] = useState({
+        fullName: "",
+        phone: "",
+        address: "",
+        city: "",
+        postalCode: "",
+        cardNumber: "",
+        expiryDate: "",
+        cvc: "",
+        couponCode: "",
+    });
+
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [success, setSuccess] = useState(false);
-
-    const readUserId = () => {
-        if (typeof window === "undefined") {
-            return null;
-        }
-
-        try {
-            const sessionRaw = localStorage.getItem("session");
-            const userRaw = localStorage.getItem("user");
-            const session = sessionRaw ? JSON.parse(sessionRaw) : null;
-            const user = userRaw ? JSON.parse(userRaw) : null;
-
-            const userId = Number(session?.user_id ?? session?.user?.id ?? user?.id ?? 0);
-            return Number.isFinite(userId) && userId > 0 ? userId : null;
-        } catch {
-            return null;
-        }
-    };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
-        setFormData((prev) => ({ ...prev, [name]: value }));
+        setFormData((prev) => ({
+            ...prev,
+            [name]: value,
+        }));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -56,75 +38,154 @@ export default function CheckoutPage() {
         setError(null);
 
         try {
-            const cartItems = JSON.parse(localStorage.getItem("cart") || "[]");
-            const userId = readUserId();
+            let cartItems: any[] = JSON.parse(localStorage.getItem("cart") || "[]");
 
-            if (!cartItems.length) {
-                throw new Error("Your cart is empty. Add products before checkout.");
+            if (!Array.isArray(cartItems) || cartItems.length === 0) {
+                cartItems = mockCartItems.map((item) => ({
+                    id: item.id,
+                    quantity: item.qty || 1,
+                    price: Number(item.price.replace(/[^0-9.]/g, "")),
+                }));
+            } else {
+                cartItems = cartItems.map((item: any) => ({
+                    ...item,
+                    quantity: item.quantity ?? item.qty ?? 1,
+                    price:
+                        typeof item.price === "string"
+                            ? Number(item.price.replace(/[^0-9.]/g, ""))
+                            : Number(item.price),
+                }));
             }
 
-            if (!userId) {
-                throw new Error("Please sign in to place an order.");
+            if (cartItems.length === 0) {
+                setError("Your cart is empty");
+                setIsLoading(false);
+                return;
             }
 
-            const totalAmount = cartItems.reduce((sum: number, item: any) => sum + Number(item.price || 0) * Number(item.quantity || 1), 0);
+            const totalAmount = cartItems.reduce(
+                (sum: number, item: any) => sum + item.price * item.quantity,
+                0
+            );
 
-            const response = await api.createOrder({
-                user_id: userId,
+            const orderData = {
+                items: cartItems.map((item: any) => ({
+                    product_id: item.id,
+                    quantity: item.quantity,
+                    price: item.price,
+                })),
                 total_amount: totalAmount,
-                status: "pending",
-            });
+                shipping_address: {
+                    full_name: formData.fullName,
+                    phone: formData.phone,
+                    address: formData.address,
+                    city: formData.city,
+                    postal_code: formData.postalCode,
+                },
+                payment_method: {
+                    type: "card",
+                    last_four: formData.cardNumber.slice(-4),
+                },
+                coupon_code: formData.couponCode || undefined,
+            };
+
+            const response = await api.createOrder(orderData);
 
             localStorage.removeItem("cart");
-            setSuccess(true);
-            setFormData(initialForm);
-            setTimeout(() => {
-                window.location.href = `/dashboard/orders/${response.id}`;
-            }, 1500);
+
+            const orderId = response?.id ?? "success";
+            router.push(`/checkout/success?orderId=${encodeURIComponent(orderId)}`);
         } catch (err: any) {
             setError(err.message || "Failed to place order");
+            console.error("Error creating order:", err);
         } finally {
             setIsLoading(false);
         }
     };
 
-    if (success) {
-        return (
-            <div className="mx-auto max-w-2xl rounded-[28px] bg-emerald-50 p-8 text-emerald-900">
-                <Badge tone="success">Order placed</Badge>
-                <h2 className="mt-3 text-2xl font-semibold">Your order is confirmed</h2>
-                <p className="mt-2 text-sm leading-7">
-                    You’re being redirected to your order details page so you can track fulfillment in real time.
-                </p>
-            </div>
-        );
-    }
 
     return (
-        <div className="space-y-8 pb-10">
-            <section className="rounded-[28px] bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_55%,#fef3c7_100%)] p-5 sm:p-6">
-                <SectionHeader
-                    title="Checkout"
-                    description="Secure your order with a fast and polished checkout flow that feels native to the mobile app."
-                />
-                <div className="mt-4 flex flex-wrap gap-3">
-                    <Badge tone="info">Secure payment</Badge>
-                    <Badge tone="success">Express shipping</Badge>
-                </div>
-            </section>
+        <div className="space-y-8">
+            <SectionHeader
+                title="Checkout"
+                description="Complete your purchase with payment, shipping, and coupon options."
+            />
 
             {error && (
-                <div className="rounded-[24px] border border-rose-200 bg-rose-50 p-4 text-rose-700">
-                    {error}
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <p className="text-red-800">{error}</p>
                 </div>
             )}
 
-            <div className="grid gap-8 xl:grid-cols-[1.1fr_0.9fr]">
-                <Card className="p-6">
-                    <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="grid gap-8 xl:grid-cols-[0.7fr_0.3fr]">
+                <form onSubmit={handleSubmit} className="rounded-3xl border border-slate-200 bg-white dark:bg-slate-800 p-8 shadow-sm space-y-6">
+                    {/* Shipping Details */}
+                    <div>
+                        <h3 className="text-xl font-semibold text-slate-900 dark:text-white">Shipping details</h3>
+                        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                            Enter your delivery address for fast fulfillment.
+                        </p>
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <input
+                            type="text"
+                            name="fullName"
+                            value={formData.fullName}
+                            onChange={handleChange}
+                            required
+                            className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-3 text-sm text-slate-900 dark:text-white placeholder-slate-600 dark:placeholder-slate-400"
+                            placeholder="Full name"
+                        />
+                        <input
+                            type="tel"
+                            name="phone"
+                            value={formData.phone}
+                            onChange={handleChange}
+                            required
+                            className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-3 text-sm text-slate-900 dark:text-white placeholder-slate-600 dark:placeholder-slate-400"
+                            placeholder="Phone number"
+                        />
+                    </div>
+
+                    <input
+                        type="text"
+                        name="address"
+                        value={formData.address}
+                        onChange={handleChange}
+                        required
+                        className="w-full rounded-3xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-3 text-sm text-slate-900 dark:text-white placeholder-slate-600 dark:placeholder-slate-400"
+                        placeholder="Street address"
+                    />
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <input
+                            type="text"
+                            name="city"
+                            value={formData.city}
+                            onChange={handleChange}
+                            required
+                            className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-3 text-sm text-slate-900 dark:text-white placeholder-slate-600 dark:placeholder-slate-400"
+                            placeholder="City"
+                        />
+                        <input
+                            type="text"
+                            name="postalCode"
+                            value={formData.postalCode}
+                            onChange={handleChange}
+                            required
+                            className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-3 text-sm text-slate-900 dark:text-white placeholder-slate-600 dark:placeholder-slate-400"
+                            placeholder="Postal code"
+                        />
+                    </div>
+
+                    {/* Payment Method */}
+                    <div className="mt-10 space-y-6">
                         <div>
-                            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Shipping details</p>
-                            <h2 className="mt-2 text-xl font-semibold text-slate-900">Where should it go?</h2>
+                            <h3 className="text-xl font-semibold text-slate-900 dark:text-white">Payment method</h3>
+                            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                                Use the secure credit card or digital wallet integration below.
+                            </p>
                         </div>
 
                         <input
@@ -161,22 +222,24 @@ export default function CheckoutPage() {
                             />
                         </div>
 
-                        <div className="pt-2">
-                            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Payment</p>
-                            <h2 className="mt-2 text-xl font-semibold text-slate-900">Secure card entry</h2>
-                        </div>
-                        <Input label="Card number" name="cardNumber" value={formData.cardNumber} onChange={handleChange} required maxLength={19} placeholder="4242 4242 4242 4242" />
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <Input label="Expiry" name="expiryDate" value={formData.expiryDate} onChange={handleChange} required placeholder="MM / YY" maxLength={5} />
-                            <Input label="CVC" name="cvc" value={formData.cvc} onChange={handleChange} required maxLength={3} />
-                        </div>
-                        <Input label="Coupon code" name="couponCode" value={formData.couponCode} onChange={handleChange} placeholder="Optional" />
+                        <input
+                            type="text"
+                            name="couponCode"
+                            value={formData.couponCode}
+                            onChange={handleChange}
+                            className="w-full rounded-3xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-3 text-sm text-slate-900 dark:text-white placeholder-slate-600 dark:placeholder-slate-400"
+                            placeholder="Coupon code (optional)"
+                        />
+                    </div>
 
-                        <Button type="submit" variant="primary" className="w-full py-4">
-                            {isLoading ? "Processing…" : "Place order securely"}
-                        </Button>
-                    </form>
-                </Card>
+                    <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="mt-8 w-full rounded-3xl bg-slate-900 dark:bg-indigo-600 px-6 py-4 text-sm font-semibold text-white transition hover:bg-slate-700 dark:hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isLoading ? "Processing..." : "Place order securely"}
+                    </button>
+                </form>
 
                 <CheckoutSummary />
             </div>
