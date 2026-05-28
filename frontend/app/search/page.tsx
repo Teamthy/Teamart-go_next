@@ -187,7 +187,7 @@ export default function SearchPage() {
                     <div className="grid gap-4 md:grid-cols-2">
                         {activeTab === "Products" && filteredProducts.map((product) => (
                             <Link key={product.id} href={`/products/${product.id}`}>
-                                <ProductCard product={product} />
+                                <ProductCard product={product} showDetailLink={false} />
                             </Link>
                         ))}
 
