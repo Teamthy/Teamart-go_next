@@ -1,5 +1,9 @@
 import SectionHeader from "@/components/ui/SectionHeader";
+<<<<<<< HEAD
 import { sessionHistory } from "@/lib/mock/users";
+=======
+import { sessionHistory } from "@/lib/mock-data";
+>>>>>>> 36e8d4c (feat(auth): production auth flows and onboarding UI)
 
 export default function SessionsPage() {
     return (
