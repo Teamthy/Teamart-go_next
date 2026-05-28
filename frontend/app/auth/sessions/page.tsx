@@ -1,4 +1,4 @@
-import SectionHeader from "@/components/SectionHeader";
+import SectionHeader from "@/components/ui/SectionHeader";
 import { sessionHistory } from "@/lib/mock-data";
 
 export default function SessionsPage() {
