@@ -1,8 +1,8 @@
-import ChatPanel from "@/components/ChatPanel";
-import LiveVideoPlayer from "@/components/LiveVideoPlayer";
-import LivestreamStatus from "@/components/LivestreamStatus";
-import ProductPinning from "@/components/ProductPinning";
-import ReactionPanel from "@/components/ReactionPanel";
+import ChatPanel from "@/components/livestream/ChatPanel";
+import LiveVideoPlayer from "@/components/livestream/LiveVideoPlayer";
+import LivestreamStatus from "@/components/livestream/LivestreamStatus";
+import ProductPinning from "@/components/product/ProductPinning";
+import ReactionPanel from "@/components/livestream/ReactionPanel";
 
 export default function LivestreamStatusPage() {
     return (

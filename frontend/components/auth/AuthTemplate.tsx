@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Lock, Mail, ShieldCheck, Sparkles } from "lucide-react";
 import * as api from "@/lib/api";
+import { getStoredCustomer, saveCustomer } from "@/lib/auth-state";
 
 const registerRoles = ["Shopper", "Creator", "Merchant"] as const;
 
@@ -33,11 +34,28 @@ function AuthIllustration() {
 export default function AuthTemplate({ variant = "login" }: { variant?: "login" | "register" | "mfa" }) {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
     const [otp, setOtp] = useState("");
     const [remember, setRemember] = useState(false);
     const [selectedRole, setSelectedRole] = useState<Role>("Shopper");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [step, setStep] = useState(0);
+    const [resetSent, setResetSent] = useState(false);
+    const [passwordUpdated, setPasswordUpdated] = useState(false);
+    const [currentVariant, setCurrentVariant] = useState<AuthVariant>(variant);
+    const [selectedRole, setSelectedRole] = useState<AuthRole>(defaultRole);
+    const [signupStep, setSignupStep] = useState(1);
+    const [customerFirstName, setCustomerFirstName] = useState("");
+    const [customerLastName, setCustomerLastName] = useState("");
+    const [customerFavoriteCategory, setCustomerFavoriteCategory] = useState("");
+    const [creatorName, setCreatorName] = useState("");
+    const [creatorNiche, setCreatorNiche] = useState("");
+    const [creatorHandle, setCreatorHandle] = useState("");
+    const [merchantOwnerName, setMerchantOwnerName] = useState("");
+    const [merchantStoreName, setMerchantStoreName] = useState("");
+    const [merchantCategory, setMerchantCategory] = useState("");
+    const [merchantWebsite, setMerchantWebsite] = useState("");
     const router = useRouter();
 
     const isLogin = variant === "login";
@@ -47,13 +65,15 @@ export default function AuthTemplate({ variant = "login" }: { variant?: "login" 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
-        setLoading(true);
+        setResetSent(false);
+        setPasswordUpdated(false);
+    };
 
         try {
             if (isMfa) {
                 const pending = sessionStorage.getItem("pendingSession");
                 const sess = pending ? JSON.parse(pending) : null;
-                const sessionId = sess?.session_id || sess?.sessionID || sess?.sessionID;
+                const sessionId = sess?.session_id || sess?.sessionID;
                 if (!sessionId) throw new Error("Missing pending session for MFA");
 
                 await api.verifyOTP(sessionId, otp);
@@ -65,14 +85,12 @@ export default function AuthTemplate({ variant = "login" }: { variant?: "login" 
             if (isLogin) {
                 const res = await api.login(email, password);
                 sessionStorage.setItem("session", JSON.stringify(res));
+
                 if (res.requires_mfa || res.requiresMFA) {
                     sessionStorage.setItem("pendingSession", JSON.stringify(res));
                     router.push("/auth/mfa");
-                } else {
-                    router.push("/");
+                    return;
                 }
-                return;
-            }
 
             if (isRegister) {
                 const res = await api.signup(email, password);
@@ -80,12 +98,21 @@ export default function AuthTemplate({ variant = "login" }: { variant?: "login" 
                 router.push("/auth/login");
                 return;
             }
+
+            const res = await api.signup(email, password);
+            persistAuthResponse(res);
+            sessionStorage.setItem("signupResult", JSON.stringify(res));
+            router.push("/auth/login");
         } catch (err: any) {
             setError(err?.message || "Request failed");
         } finally {
             setLoading(false);
         }
     };
+
+    const footerLink = variant === "login" ? "/auth/register" : "/auth/login";
+    const footerPrompt = variant === "login" ? "Don’t have an account?" : "Already have an account?";
+    const footerCta = variant === "login" ? "Sign up" : "Sign in";
 
     return (
         <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(236,72,153,0.14),transparent_28%),linear-gradient(180deg,#050816_0%,#0b1124_100%)] px-4 py-12 text-white sm:px-6 lg:px-8">

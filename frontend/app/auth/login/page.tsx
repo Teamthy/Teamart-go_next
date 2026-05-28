@@ -1,6 +1,4 @@
-import AuthForm from "@/components/auth/AuthForm";
-import PageHeader from "@/components/ui/PageHeader";
-import Link from "next/link";
+import AuthTemplate from "@/components/auth/AuthTemplate";
 
 export default function LoginPage() {
     return (

@@ -1,130 +1,79 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import ProductCard from "@/components/product/ProductCard";
-import SectionHeader from "@/components/ui/SectionHeader";
-import * as api from "@/lib/api";
+import PageHeader from "@/components/ui/PageHeader";
+import ProductGrid from "@/components/ui/ProductGrid";
+import StatCard from "@/components/ui/StatCard";
+import Tabs from "@/components/ui/Tabs";
+import EmptyState from "@/components/ui/EmptyState";
+import Button from "@/components/ui/button";
+import { products, productCategories } from "@/lib/mock/products";
 
-interface Product {
-    id: number;
-    name: string;
-    description?: string;
-    price: number;
-    sku?: string;
-    category?: string;
-    image_url?: string;
-    stock?: number;
-    created_at?: string;
-}
+const categories = ["all", ...productCategories];
 
 export default function ProductsPage() {
-    const [products, setProducts] = useState<Product[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const [activeCategory, setActiveCategory] = useState("all");
     const [searchQuery, setSearchQuery] = useState("");
-    const [isSearching, setIsSearching] = useState(false);
 
-    useEffect(() => {
-        const fetchProducts = async () => {
-            setIsLoading(true);
-            setError(null);
-            try {
-                const response = await api.listProducts(50, 0);
-                setProducts(response.products || []);
-            } catch (err: any) {
-                setError(err.message || "Failed to fetch products");
-                console.error("Error fetching products:", err);
-            } finally {
-                setIsLoading(false);
-            }
-        };
+    const filteredProducts = useMemo(() => {
+        const query = searchQuery.trim().toLowerCase();
 
-        fetchProducts();
-    }, []);
+        return products.filter((product) => {
+            const matchesCategory = activeCategory === "all" || product.category === activeCategory;
+            const matchesQuery = !query || `${product.name} ${product.description} ${product.creator ?? ""}`.toLowerCase().includes(query);
 
-    const handleSearch = async (query: string) => {
-        if (!query.trim()) {
-            setSearchQuery("");
-            try {
-                const response = await api.listProducts(50, 0);
-                setProducts(response.products || []);
-            } catch (err) {
-                console.error("Error fetching products:", err);
-            }
-            return;
-        }
-
-        setSearchQuery(query);
-        setIsSearching(true);
-        try {
-            const response = await api.searchProducts(query, 50, 0);
-            setProducts(response.products || []);
-        } catch (err: any) {
-            setError(err.message || "Search failed");
-            console.error("Error searching products:", err);
-        } finally {
-            setIsSearching(false);
-        }
-    };
+            return matchesCategory && matchesQuery;
+        });
+    }, [activeCategory, searchQuery]);
 
     return (
-        <div className="space-y-8">
-            <SectionHeader
+        <div className="space-y-8 pb-10">
+            <PageHeader
                 title="Products"
-                description="Browse the catalog and explore creator products."
+                description="Browse a curated catalog of creator picks, merchant bundles, and social-ready products built for fast discovery."
+                actions={
+                    <>
+                        <Button asChild variant="primary">
+                            <Link href="/feed">Explore feed</Link>
+                        </Button>
+                        <Button asChild variant="secondary">
+                            <Link href="/live">Watch live</Link>
+                        </Button>
+                    </>
+                }
             />
 
-            {/* Search Bar */}
-            <div className="flex gap-2">
-                <input
-                    type="text"
-                    placeholder="Search products..."
-                    value={searchQuery}
-                    onChange={(e) => handleSearch(e.target.value)}
-                    className="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                />
+            <div className="grid gap-4 md:grid-cols-3">
+                <StatCard label="Catalog size" value={String(products.length)} helper="A healthy mix of creator and merchant products is surfaced here." />
+                <StatCard label="Top category" value="Accessories" helper="Accessory bundles continue to perform strongly in discovery and checkout." />
+                <StatCard label="Live-ready" value="12" helper="Products are curated for sharing, pinning, and fast purchase moments." />
             </div>
 
-            {/* Loading State */}
-            {isLoading && (
-                <div className="flex justify-center items-center py-12">
-                    <p className="text-gray-500 dark:text-gray-400">Loading products...</p>
+            <div className="rounded-[28px] border border-zinc-200 bg-white p-4 sm:p-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                        <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">Search and filter</p>
+                        <p className="mt-2 text-sm text-zinc-600">Search by name, description, or creator name to tune the catalog for your audience.</p>
+                    </div>
+                    <div className="flex-1 lg:max-w-xl">
+                        <input
+                            type="text"
+                            placeholder="Search products, creators, or product cues"
+                            value={searchQuery}
+                            onChange={(event) => setSearchQuery(event.target.value)}
+                            className="w-full rounded-[24px] border border-zinc-200 px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-[#E91E63]"
+                        />
+                    </div>
                 </div>
-            )}
+            </div>
 
-            {/* Error State */}
-            {error && !isLoading && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                    <p className="text-red-800 dark:text-red-200">Error: {error}</p>
-                </div>
-            )}
+            <Tabs tabs={categories.map((category) => ({ label: category === "all" ? "All products" : category, value: category }))} active={activeCategory} onChange={setActiveCategory} />
 
-            {/* Empty State */}
-            {!isLoading && products.length === 0 && !error && (
-                <div className="text-center py-12">
-                    <p className="text-gray-500 dark:text-gray-400">
-                        {searchQuery ? "No products found matching your search." : "No products available."}
-                    </p>
-                </div>
-            )}
-
-            {/* Products Grid */}
-            {!isLoading && products.length > 0 && (
-                <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-                    {products.map((product) => (
-                        <Link key={product.id} href={`/products/${product.id}`}>
-                            <div className="h-full">
-                                <ProductCard
-                                    product={{
-                                        ...product,
-                                        image: product.image_url,
-                                    }}
-                                />
-                            </div>
-                        </Link>
-                    ))}
-                </div>
+            {filteredProducts.length === 0 ? (
+                <EmptyState title="No matching products" description="Try a different category or search term to surface more items." />
+            ) : (
+                <ProductGrid products={filteredProducts} />
             )}
         </div>
     );
