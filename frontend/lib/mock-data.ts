@@ -39,15 +39,98 @@ export const recommendedProducts = [
     },
 ];
 
+export const featuredProducts = products;
+
+export const categories = [
+    { slug: "fashion", name: "Fashion" },
+    { slug: "home", name: "Home" },
+    { slug: "beauty", name: "Beauty" },
+    { slug: "tech", name: "Tech" },
+    { slug: "art", name: "Art" },
+    { slug: "wellness", name: "Wellness" },
+];
+
+export const creators = [
+    {
+        id: "mia-rivera",
+        name: "Mia Rivera",
+        handle: "mia",
+        bio: "Creator partner blending lifestyle drops, live commerce, and curated collections.",
+        avatar: "/creator-mia.jpg",
+        followers: "42.1k",
+        liveStatus: "Live now",
+        products: 28,
+        rating: 4.9,
+        category: "Lifestyle",
+    },
+    {
+        id: "nina-park",
+        name: "Nina Park",
+        handle: "ninapark",
+        bio: "Beauty and fashion creator serving limited edition drops in every stream.",
+        avatar: "/creator-nina.jpg",
+        followers: "31.4k",
+        liveStatus: "Offline",
+        products: 22,
+        rating: 4.8,
+        category: "Beauty",
+    },
+    {
+        id: "leo-chan",
+        name: "Leo Chan",
+        handle: "leoch",
+        bio: "Tech creator who launches gadgets, studio accessories, and livestream bundles.",
+        avatar: "/creator-leo.jpg",
+        followers: "18.7k",
+        liveStatus: "Ending soon",
+        products: 16,
+        rating: 4.7,
+        category: "Tech",
+    },
+    {
+        id: "ava-simpson",
+        name: "Ava Simpson",
+        handle: "ava_sims",
+        bio: "Home décor creator featuring pop-up drops and creator-curated service pieces.",
+        avatar: "/creator-ava.jpg",
+        followers: "26.9k",
+        liveStatus: "Offline",
+        products: 19,
+        rating: 4.9,
+        category: "Home",
+    },
+    {
+        id: "kai-evans",
+        name: "Kai Evans",
+        handle: "kaievans",
+        bio: "Creator focused on activewear, drops, and fast checkout bundles for followers.",
+        avatar: "/creator-kai.jpg",
+        followers: "12.2k",
+        liveStatus: "Live now",
+        products: 24,
+        rating: 4.6,
+        category: "Fashion",
+    },
+    {
+        id: "zara-bell",
+        name: "Zara Bell",
+        handle: "zarabell",
+        bio: "Studio entrepreneur and creator launching merch and livestream collaborations.",
+        avatar: "/creator-zara.jpg",
+        followers: "9.8k",
+        liveStatus: "Offline",
+        products: 12,
+        rating: 4.7,
+        category: "Creator",
+    },
+];
+
 export const sessionHistory = [
     { id: "s1", device: "Chrome on Windows", location: "New York, NY", active: true },
     { id: "s2", device: "iPhone 15", location: "San Francisco, CA", active: false },
 ];
 
-export const cartItems = [
-    { id: "1", name: "Sustainable Canvas Tote", price: "$32", qty: 1 },
-    { id: "2", name: "Artist Collaboration Hoodie", price: "$74", qty: 2 },
-];
+// cartItems and wishlistItems have moved to lib/mock/products
 
 export const sellerProducts = [
     { id: "p1", sku: "TA-2024-01", name: "Artisanal Ceramic Mug", price: "$28", stock: 34, status: "Live", sales: 154 },
@@ -85,4 +168,48 @@ export const sellerPayouts = [
     { id: "P-308", amount: "$1,220", period: "May 11 - May 17", status: "Completed" },
     { id: "P-309", amount: "$1,750", period: "May 18 - May 24", status: "Pending" },
     { id: "P-310", amount: "$430", period: "May 25 - May 31", status: "Scheduled" },
+];
+
+export const accountProfile = {
+    name: "Mia Rivera",
+    email: "mia@teamart.co",
+    location: "San Francisco, CA",
+    favoriteStorefront: "Creator drops",
+    shippingAddress: "142 Valencia St, San Francisco, CA 94103",
+    memberSince: "May 2024",
+    plan: "Growth",
+};
+
+export const accountOrderSnapshot = [
+    "3 orders in progress",
+    "1 order awaiting shipment",
+    "2 completed deliveries",
+    "Fast response time this week",
+];
+
+export const accountPreferences = [
+    { label: "Discovery", value: "Personalized recommendations enabled" },
+    { label: "Marketing", value: "Weekly creator drops and promotions" },
+    { label: "Notifications", value: "Live stream reminders and order updates" },
+    { label: "Language", value: "English (US)" },
+];
+
+export const accountPaymentMethods = [
+    { label: "Visa ending in 2412", value: "Primary" },
+    { label: "PayPal", value: "Secondary" },
+    { label: "Apple Pay", value: "Fast checkout" },
+];
+
+export const accountBillingHistory = [
+    "Subscription invoice paid",
+    "Pending payment authorization",
+    "Card update available for faster checkout",
+];
+
+export const customerOrders = [
+    { id: "O-7124", date: "May 25", customer: "Mia Rivera", items: 4, total: "$122.00", status: "Shipped", delivery: "Arrives May 30" },
+    { id: "O-7118", date: "May 22", customer: "Mia Rivera", items: 2, total: "$86.00", status: "Processing", delivery: "Preparing shipment" },
+    { id: "O-7109", date: "May 18", customer: "Mia Rivera", items: 3, total: "$148.00", status: "Delivered", delivery: "Delivered May 23" },
+    { id: "O-7084", date: "May 13", customer: "Mia Rivera", items: 1, total: "$34.00", status: "Delivered", delivery: "Delivered May 17" },
+    { id: "O-7062", date: "May 10", customer: "Mia Rivera", items: 5, total: "$214.00", status: "Canceled", delivery: "Canceled" },
 ];

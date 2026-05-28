@@ -1,54 +1,40 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import CreatorProfileCard from "@/components/product/CreatorProfileCard";
 import ProductCard from "@/components/product/ProductCard";
-import Button from "@/components/ui/button";
-import Card from "@/components/ui/card";
-import { creatorProfiles } from "@/lib/mock/creators";
-import { products } from "@/lib/mock/products";
+import { creators, recommendedProducts } from "@/lib/mock-data";
 
-export default async function CreatorProfilePage({ params }: { params: Promise<{ slug: string }> }) {
-    const { slug } = await params;
-    const creator = creatorProfiles.find((item) => item.id === slug);
+function getCreator(slug: string) {
+    return creators.find((creator) => creator.id === slug);
+}
+
+export default function CreatorProfilePage({ params }: { params: { slug: string } }) {
+    const creator = getCreator(params.slug);
 
     if (!creator) {
         notFound();
     }
 
-    const creatorProducts = products.filter((product) => product.creator === creator.name).slice(0, 4);
+    const featuredProducts = recommendedProducts.slice(0, 6);
 
     return (
-        <div className="space-y-8 pb-10">
-            <CreatorProfileCard creator={creator} />
+        <div className="min-h-screen space-y-8 bg-[#F9F5F8] px-4 py-10 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-7xl space-y-8">
+                <CreatorProfileCard creator={creator} />
 
-            <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-                <Card className="p-5">
-                    <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">Creator notes</p>
-                    <h2 className="mt-3 text-xl font-semibold text-zinc-900">What this creator is spotlighting</h2>
-                    <div className="mt-4 space-y-3 text-sm text-zinc-600">
-                        <p>{creator.bio}</p>
-                        <div className="rounded-[20px] bg-[#FFF8FB] px-4 py-3">
-                            <p className="font-semibold text-zinc-900">Live schedule</p>
-                            <p className="mt-1">{creator.livestreamSchedule}</p>
+                <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+                    <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h2 className="text-2xl font-semibold text-slate-900">Featured drops</h2>
+                            <p className="text-sm text-slate-600">Shop the creator's latest collection and livestream picks.</p>
                         </div>
+                        <span className="rounded-full bg-[#FCE4EC] px-4 py-2 text-sm font-semibold text-[#C2185B]">{creator.liveStatus}</span>
                     </div>
-                    <div className="mt-5 flex flex-wrap gap-3">
-                        <Button asChild variant="primary">
-                            <Link href="/live">Join live</Link>
-                        </Button>
-                        <Button asChild variant="secondary">
-                            <Link href="/products">Shop creator picks</Link>
-                        </Button>
-                    </div>
-                </Card>
-                <Card className="p-5">
-                    <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">Featured products</p>
-                    <div className="mt-4 grid gap-4 md:grid-cols-2">
-                        {creatorProducts.map((product) => (
+                    <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+                        {featuredProducts.map((product) => (
                             <ProductCard key={product.id} product={product} />
                         ))}
                     </div>
-                </Card>
+                </section>
             </div>
         </div>
     );
