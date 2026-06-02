@@ -1,5 +1,13 @@
-import type { Creator } from "@/types/creator";
 import Link from "next/link";
+
+type Creator = {
+    id: string;
+    name: string;
+    handle: string;
+    avatar: string;
+    followers: string;
+    liveStatus?: string;
+};
 
 export default function CreatorProfileCard({
     creator,
