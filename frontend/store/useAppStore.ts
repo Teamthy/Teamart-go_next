@@ -5,7 +5,7 @@ export interface NotificationItem {
     title: string;
     body: string;
     type: string;
-    payload?: any;
+    payload?: unknown;
     receivedAt: string;
     read?: boolean;
 }

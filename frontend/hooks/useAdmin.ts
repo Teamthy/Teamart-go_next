@@ -24,6 +24,18 @@ export interface FraudAlert {
     created_at?: string;
 }
 
+export interface AuditLog {
+    id?: string;
+    action?: string;
+    created_at?: string;
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+    if (error instanceof Error) return error.message;
+    if (typeof error === "string") return error;
+    return fallback;
+}
+
 export function useAdminDashboard() {
     const [dashboard, setDashboard] = useState<DashboardSummary | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -36,8 +48,8 @@ export function useAdminDashboard() {
             try {
                 const response = await api.getAdminDashboard();
                 setDashboard(response);
-            } catch (err: any) {
-                setError(err.message || "Failed to fetch dashboard");
+            } catch (err: unknown) {
+                setError(getErrorMessage(err, "Failed to fetch dashboard"));
             } finally {
                 setIsLoading(false);
             }
@@ -61,8 +73,8 @@ export function useDisputes() {
             try {
                 const response = await api.listDisputes();
                 setDisputes(response || []);
-            } catch (err: any) {
-                setError(err.message || "Failed to fetch disputes");
+            } catch (err: unknown) {
+                setError(getErrorMessage(err, "Failed to fetch disputes"));
             } finally {
                 setIsLoading(false);
             }
@@ -86,8 +98,8 @@ export function useFraudAlerts() {
             try {
                 const response = await api.listFraudAlerts();
                 setAlerts(response || []);
-            } catch (err: any) {
-                setError(err.message || "Failed to fetch fraud alerts");
+            } catch (err: unknown) {
+                setError(getErrorMessage(err, "Failed to fetch fraud alerts"));
             } finally {
                 setIsLoading(false);
             }
@@ -100,7 +112,7 @@ export function useFraudAlerts() {
 }
 
 export function useAuditLogs() {
-    const [logs, setLogs] = useState<any[]>([]);
+    const [logs, setLogs] = useState<AuditLog[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -111,8 +123,8 @@ export function useAuditLogs() {
             try {
                 const response = await api.listAuditLogs();
                 setLogs(response || []);
-            } catch (err: any) {
-                setError(err.message || "Failed to fetch audit logs");
+            } catch (err: unknown) {
+                setError(getErrorMessage(err, "Failed to fetch audit logs"));
             } finally {
                 setIsLoading(false);
             }

@@ -21,6 +21,7 @@ export interface Product {
     featured?: boolean;
     creator?: string;
     inventory?: string;
+    stock?: number;
     variants?: ProductVariant[];
     deliveryWindow?: string;
     reviewCount?: string;
@@ -606,4 +607,11 @@ export const sellerProducts: SellerProduct[] = products.map((product, index) => 
     stock: 8 + (index % 10) * 4,
     status: index % 5 === 0 ? "Low stock" : "Live",
     sales: 30 + index * 12,
+}));
+
+export const cartItems = products.slice(0, 5).map((product) => ({
+    id: product.id,
+    name: product.name,
+    price: product.price,
+    qty: 1,
 }));

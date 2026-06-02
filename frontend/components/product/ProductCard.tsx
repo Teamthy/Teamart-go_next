@@ -1,12 +1,5 @@
 import Link from "next/link";
-
-type Product = {
-    id: string;
-    name: string;
-    description: string;
-    price: string;
-    image: string;
-};
+import type { Product } from "@/types/product";
 
 export default function ProductCard({
     product,

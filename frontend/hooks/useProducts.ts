@@ -15,6 +15,12 @@ export interface Product {
     created_at?: string;
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+    if (error instanceof Error) return error.message;
+    if (typeof error === "string") return error;
+    return fallback;
+}
+
 export function useProducts(limit = 20, offset = 0) {
     const [products, setProducts] = useState<Product[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -27,8 +33,8 @@ export function useProducts(limit = 20, offset = 0) {
             try {
                 const response = await api.listProducts(limit, offset);
                 setProducts(response.products || []);
-            } catch (err: any) {
-                setError(err.message || "Failed to fetch products");
+            } catch (err: unknown) {
+                setError(getErrorMessage(err, "Failed to fetch products"));
             } finally {
                 setIsLoading(false);
             }
@@ -44,8 +50,8 @@ export function useProducts(limit = 20, offset = 0) {
             const response = await api.searchProducts(query, limit, offset);
             setProducts(response.products || []);
             return response;
-        } catch (err: any) {
-            setError(err.message || "Search failed");
+        } catch (err: unknown) {
+            setError(getErrorMessage(err, "Search failed"));
             throw err;
         } finally {
             setIsLoading(false);
@@ -58,8 +64,8 @@ export function useProducts(limit = 20, offset = 0) {
         try {
             const response = await api.getProduct(productId);
             return response;
-        } catch (err: any) {
-            setError(err.message || "Failed to fetch product");
+        } catch (err: unknown) {
+            setError(getErrorMessage(err, "Failed to fetch product"));
             throw err;
         } finally {
             setIsLoading(false);
@@ -83,8 +89,8 @@ export function useProduct(productId: number | string | null) {
             try {
                 const response = await api.getProduct(productId);
                 setProduct(response);
-            } catch (err: any) {
-                setError(err.message || "Failed to fetch product");
+            } catch (err: unknown) {
+                setError(getErrorMessage(err, "Failed to fetch product"));
             } finally {
                 setIsLoading(false);
             }
@@ -100,14 +106,14 @@ export function useCreateProduct() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const create = async (data: any) => {
+    const create = async (data: Record<string, unknown>) => {
         setIsLoading(true);
         setError(null);
         try {
             const response = await api.createProduct(data);
             return response;
-        } catch (err: any) {
-            setError(err.message || "Failed to create product");
+        } catch (err: unknown) {
+            setError(getErrorMessage(err, "Failed to create product"));
             throw err;
         } finally {
             setIsLoading(false);

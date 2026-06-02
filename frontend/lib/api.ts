@@ -1,3 +1,13 @@
+import type {
+    CartPayload,
+    FeedItem,
+    FeedPage,
+    LiveChatMessage,
+    LiveRoomDetails,
+    LiveRoomSummary,
+    ProductDetail,
+} from "@/types/commerce";
+
 export const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
 type AuthUser = {
@@ -72,53 +82,60 @@ let isRefreshingToken = false;
 let refreshTokenPromise: Promise<string | null> | null = null;
 
 // Exponential backoff retry logic
-async function request(
+
+type JsonBody = Record<string, unknown> | string | number | boolean | null;
+
+type RequestParams = Record<string, string | number | boolean | null | undefined>;
+type HttpMethod = "GET" | "POST" | "PUT" | "DELETE";
+
+type ApiError = Error & {
+    status?: number;
+    body?: unknown;
+    code?: unknown;
+    retryAfterMs?: number;
+};
+
+async function delay(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function request<T = any>(
     path: string,
     options: {
-        method?: string;
-        body?: any;
-        params?: Record<string, any>;
+        method?: HttpMethod;
+        body?: JsonBody;
+        params?: RequestParams;
         retries?: number;
         retryDelay?: number;
     } = {}
-): Promise<any> {
+): Promise<T> {
     const { retries = 3, retryDelay = 1000, ...requestOptions } = options;
 
     for (let attempt = 0; attempt <= retries; attempt++) {
         try {
-            return await rawRequest(path, requestOptions);
-        } catch (error: any) {
-            // Don't retry on 401 (auth error) or 403 (forbidden)
-            if (error.status === 401 || error.status === 403) {
+            return await rawRequest<T>(path, requestOptions);
+        } catch (error: unknown) {
+            const apiError = error as ApiError;
+            if (apiError.status === 401 || apiError.status === 403) {
                 throw error;
             }
 
-            // Don't retry on 4xx errors except 408, 429, 503, 504
-            if (error.status && error.status >= 400 && error.status < 500) {
-                if (![408, 429].includes(error.status)) {
+            if (apiError.status && apiError.status >= 400 && apiError.status < 500) {
+                if (![408, 429].includes(apiError.status)) {
                     throw error;
                 }
             }
 
-            // Last attempt, throw error
             if (attempt === retries) {
                 throw error;
             }
 
-            const delay = retryDelay * Math.pow(2, attempt);
-            const backoffDelay =
-                error.status === 429 && typeof error.retryAfterMs === "number" && error.retryAfterMs > 0
-                    ? error.retryAfterMs
-                    : delay;
-
-            console.warn(
-                `[API] Request failed (attempt ${attempt + 1}/${retries + 1}), retrying in ${backoffDelay}ms`,
-                error.message
-            );
-
-            await new Promise((resolve) => setTimeout(resolve, backoffDelay));
+            const backoffDelay = apiError.retryAfterMs ?? retryDelay * Math.pow(2, attempt);
+            await delay(backoffDelay);
         }
     }
+
+    throw new Error("Request failed after retries");
 }
 
 // Automatic token refresh on 401
@@ -178,14 +195,14 @@ async function refreshAccessToken(): Promise<string | null> {
 }
 
 // Generic request handler with method support
-async function rawRequest(
+async function rawRequest<T = unknown>(
     path: string,
     options: {
-        method?: string;
-        body?: any;
-        params?: Record<string, any>;
+        method?: HttpMethod;
+        body?: JsonBody;
+        params?: RequestParams;
     } = {}
-) {
+): Promise<T> {
     const { method = "POST", body, params } = options;
 
     let url = `${BASE}${path}`;
@@ -210,7 +227,6 @@ async function rawRequest(
         },
     };
 
-    // Add auth token if available
     if (typeof window !== "undefined") {
         const token = localStorage.getItem("access_token");
         if (token) {
@@ -221,17 +237,15 @@ async function rawRequest(
         }
     }
 
-    if (body) {
-        fetchOptions.body = JSON.stringify(body);
+    if (body !== undefined && body !== null) {
+        fetchOptions.body = typeof body === "string" ? body : JSON.stringify(body);
     }
 
     let res = await fetch(url, fetchOptions);
 
-    // Handle 401 Unauthorized - try to refresh token
     if (res.status === 401 && typeof window !== "undefined") {
         const newToken = await refreshAccessToken();
         if (newToken) {
-            // Retry request with new token
             fetchOptions.headers = {
                 ...fetchOptions.headers,
                 Authorization: `Bearer ${newToken}`,
@@ -240,7 +254,6 @@ async function rawRequest(
         }
     }
 
-    // Extract and track rate limit headers
     const rateLimitHeaders = {
         remaining: res.headers.get("x-ratelimit-remaining"),
         reset: res.headers.get("x-ratelimit-reset"),
@@ -248,34 +261,32 @@ async function rawRequest(
     };
 
     if (rateLimitHeaders.remaining) {
-        rateLimitRemaining = parseInt(rateLimitHeaders.remaining);
+        rateLimitRemaining = parseInt(rateLimitHeaders.remaining, 10);
     }
     if (rateLimitHeaders.reset) {
-        rateLimitReset = parseInt(rateLimitHeaders.reset) * 1000; // Convert to ms
-    }
-
-    // Warn if approaching rate limit
-    if (rateLimitRemaining < 100) {
-        console.warn(
-            `[API] Approaching rate limit: ${rateLimitRemaining} requests remaining`
-        );
+        rateLimitReset = parseInt(rateLimitHeaders.reset, 10) * 1000;
     }
 
     const text = await res.text();
+    let json: unknown = null;
 
-    let json: any = null;
     try {
         json = text ? JSON.parse(text) : null;
-    } catch (e) {
+    } catch {
         throw new Error(`Invalid JSON response: ${text}`);
     }
 
     if (!res.ok) {
-        const msg = (json && json.message) || res.statusText || "Request failed";
-        const err: any = new Error(msg);
+        const body = typeof json === "object" && json !== null ? json as Record<string, unknown> : null;
+        const msg = body && "message" in body && typeof body.message === "string"
+            ? body.message
+            : res.statusText || "Request failed";
+        const err = new Error(msg) as ApiError;
         err.status = res.status;
-        err.body = json;
-        err.code = json?.code;
+        err.body = body;
+        if (body && "code" in body) {
+            err.code = body.code;
+        }
 
         const retryAfter = res.headers.get("retry-after");
         if (retryAfter) {
@@ -285,9 +296,8 @@ async function rawRequest(
             }
         }
 
-        const rateLimitResetHeader = res.headers.get("x-ratelimit-reset");
-        if (res.status === 429 && rateLimitResetHeader) {
-            const reset = parseInt(rateLimitResetHeader, 10);
+        if (res.status === 429 && rateLimitHeaders.reset) {
+            const reset = parseInt(rateLimitHeaders.reset, 10);
             if (!Number.isNaN(reset)) {
                 err.retryAfterMs = Math.max(0, reset * 1000 - Date.now());
             }
@@ -296,7 +306,7 @@ async function rawRequest(
         throw err;
     }
 
-    return json;
+    return json as T;
 }
 
 // Export rate limit info
@@ -332,6 +342,7 @@ export async function verifyOTP(session_id: string, code: string) {
         method: "POST",
         body: {
             session_id,
+            code,
             user_agent: navigator.userAgent,
             ip_address: "0.0.0.0",
         },
@@ -365,7 +376,7 @@ export async function listUsers(limit = 20, offset = 0) {
     });
 }
 
-export async function updateUser(userId: number, data: any) {
+export async function updateUser(userId: number, data: Record<string, unknown>) {
     return request(`/users/${userId}`, {
         method: "PUT",
         body: data,
@@ -400,14 +411,14 @@ export async function searchProducts(query: string, limit = 20, offset = 0) {
     });
 }
 
-export async function createProduct(data: any) {
+export async function createProduct(data: Record<string, unknown>) {
     return request("/products", {
         method: "POST",
         body: data,
     });
 }
 
-export async function updateProduct(productId: number, data: any) {
+export async function updateProduct(productId: number, data: Record<string, unknown>) {
     return request(`/products/${productId}`, {
         method: "PUT",
         body: data,
@@ -420,7 +431,17 @@ export async function deleteProduct(productId: number) {
 
 // =============== ORDER ENDPOINTS ===============
 
-export async function createOrder(data: any) {
+export interface OrderResponse {
+    id: number | string;
+    user_id?: number;
+    total_amount?: number;
+    status?: string;
+    created_at?: string;
+    updated_at?: string;
+    [key: string]: unknown;
+}
+
+export async function createOrder(data: Record<string, unknown>): Promise<OrderResponse> {
     const storedUser = getStoredAuthUser();
     const user_id = Number(data?.user_id ?? storedUser?.id ?? 0);
 
@@ -433,7 +454,7 @@ export async function createOrder(data: any) {
         throw new Error("Your cart is empty. Add products before checkout.");
     }
 
-    return request("/orders", {
+    return request<OrderResponse>("/orders", {
         method: "POST",
         body: {
             user_id,
@@ -477,7 +498,7 @@ export async function updateOrderStatus(orderId: number, status: string) {
 
 // =============== MERCHANT ENDPOINTS ===============
 
-export async function createMerchant(data: any) {
+export async function createMerchant(data: Record<string, unknown>) {
     return request("/api/v1/merchants", {
         method: "POST",
         body: data,
@@ -488,7 +509,7 @@ export async function getMerchant(merchantId: number) {
     return request(`/api/v1/merchants/${merchantId}`, { method: "GET" });
 }
 
-export async function createStore(merchantId: number, data: any) {
+export async function createStore(merchantId: number, data: Record<string, unknown>) {
     return request(`/api/v1/merchants/${merchantId}/stores`, {
         method: "POST",
         body: data,
@@ -499,7 +520,7 @@ export async function listStores(merchantId: number) {
     return request(`/api/v1/merchants/${merchantId}/stores`, { method: "GET" });
 }
 
-export async function addStaff(merchantId: number, data: any) {
+export async function addStaff(merchantId: number, data: Record<string, unknown>) {
     return request(`/api/v1/merchants/${merchantId}/staff`, {
         method: "POST",
         body: data,
@@ -520,7 +541,7 @@ export async function listDisputes() {
     return request("/admin/disputes", { method: "GET" });
 }
 
-export async function createDispute(data: any) {
+export async function createDispute(data: Record<string, unknown>) {
     return request("/admin/disputes", {
         method: "POST",
         body: data,
@@ -549,7 +570,7 @@ export async function requestPayoutApproval(payoutId: string, requestedBy: numbe
     });
 }
 
-export async function verifyCreator(data: any) {
+export async function verifyCreator(data: Record<string, unknown>) {
     return request("/admin/creators/verify", {
         method: "POST",
         body: data,
@@ -604,7 +625,7 @@ export async function muteUser(userId: number) {
 
 // =============== ANALYTICS ENDPOINTS ===============
 
-export async function ingestAnalyticsEvent(data: any) {
+export async function ingestAnalyticsEvent(data: Record<string, unknown>) {
     return request("/api/v1/analytics/events", {
         method: "POST",
         body: data,
@@ -626,13 +647,78 @@ export async function getMarketplaceMetrics() {
 // =============== FEED ENDPOINTS ===============
 
 export async function getFeed(limit = 20) {
-    return request("/feed", {
+    return request<FeedItem[]>("/feed", {
         method: "GET",
         params: { limit },
     });
 }
 
-export async function ingestRecommendationCandidate(data: any) {
+export async function getFeedPage(limit = 20, offset = 0): Promise<FeedPage> {
+    return request<FeedPage>("/api/feed", {
+        method: "GET",
+        params: { limit, offset },
+    });
+}
+
+export async function getRecommendedFeed(limit = 10): Promise<FeedItem[]> {
+    return request<FeedItem[]>("/api/feed/recommended", {
+        method: "GET",
+        params: { limit },
+    });
+}
+
+export async function likeFeedItem(feedId: number) {
+    return request<{ success: boolean }>(`/api/feed/${feedId}/like`, {
+        method: "POST",
+    });
+}
+
+export async function bookmarkFeedItem(feedId: number) {
+    return request<{ success: boolean }>(`/api/feed/${feedId}/bookmark`, {
+        method: "POST",
+    });
+}
+
+export async function getLiveRooms(): Promise<LiveRoomSummary[]> {
+    return request<LiveRoomSummary[]>("/api/live", {
+        method: "GET",
+    });
+}
+
+export async function getLiveRoom(roomId: string): Promise<LiveRoomDetails> {
+    return request<LiveRoomDetails>(`/api/live/${roomId}`, {
+        method: "GET",
+    });
+}
+
+export async function reactLiveRoom(roomId: string, reaction: string) {
+    return request<{ success: boolean }>(`/api/live/${roomId}/react`, {
+        method: "POST",
+        body: { reaction },
+    });
+}
+
+export async function chatLiveRoom(roomId: string, message: string): Promise<LiveChatMessage> {
+    return request<LiveChatMessage>(`/api/live/${roomId}/chat`, {
+        method: "POST",
+        body: { message },
+    });
+}
+
+export async function getProductDetail(productId: number): Promise<ProductDetail> {
+    return request<ProductDetail>(`/api/products/${productId}`, {
+        method: "GET",
+    });
+}
+
+export async function addCartItem(payload: CartPayload) {
+    return request<{ success: boolean; cart_id?: number }>("/api/cart", {
+        method: "POST",
+        body: payload,
+    });
+}
+
+export async function ingestRecommendationCandidate(data: Record<string, unknown>) {
     return request("/feed/candidates", {
         method: "POST",
         body: data,

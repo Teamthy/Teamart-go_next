@@ -9,7 +9,7 @@ import { BASE } from "@/lib/api";
 interface RealtimeEvent {
     type?: string;
     topic?: string;
-    payload?: any;
+    payload?: unknown;
     title?: string;
     body?: string;
     id?: number | string;
@@ -17,25 +17,34 @@ interface RealtimeEvent {
     price?: number;
 }
 
-function normalizeFeedItem(value: any): FeedItem | null {
+function normalizeFeedItem(value: unknown): FeedItem | null {
     if (!value || typeof value !== "object") return null;
 
-    const id = Number(value.id ?? value.product_id ?? value.item_id);
+    const entry = value as Record<string, unknown>;
+    const id = Number(entry.id ?? entry.product_id ?? entry.item_id);
     if (Number.isNaN(id)) return null;
 
     return {
         id,
-        name: String(value.name ?? value.title ?? "Unknown product"),
-        description: value.description ? String(value.description) : "",
-        price: typeof value.price === "number" ? value.price : Number(value.price ?? 0),
-        image_url: value.image_url || value.image || "",
-        category: value.category || undefined,
-        score: typeof value.score === "number" ? value.score : undefined,
+        name: String(entry.name ?? entry.title ?? "Unknown product"),
+        description: typeof entry.description === "string" ? entry.description : "",
+        price: typeof entry.price === "number" ? entry.price : Number(entry.price ?? 0),
+        image_url: typeof entry.image_url === "string" ? entry.image_url : typeof entry.image === "string" ? entry.image : "",
+        category: typeof entry.category === "string" ? entry.category : undefined,
+        score: typeof entry.score === "number" ? entry.score : undefined,
     };
 }
 
-function isNotificationPayload(value: any): value is { title: string; body: string; type?: string;[key: string]: any } {
-    return !!value && typeof value === "object" && typeof value.title === "string" && typeof value.body === "string";
+function isNotificationPayload(value: unknown): value is { title: string; body: string; type?: string;[key: string]: unknown } {
+    return (
+        !!value &&
+        typeof value === "object" &&
+        value !== null &&
+        "title" in value &&
+        "body" in value &&
+        typeof (value as Record<string, unknown>).title === "string" &&
+        typeof (value as Record<string, unknown>).body === "string"
+    );
 }
 
 export function useRealtime() {
@@ -75,15 +84,20 @@ export function useRealtime() {
 
             socket.onmessage = (event) => {
                 try {
-                    const parsed: RealtimeEvent = JSON.parse(event.data.toString());
+                    const parsed = JSON.parse(event.data.toString()) as RealtimeEvent;
                     const payload = parsed.payload ?? parsed;
 
                     if (parsed.type === "error") {
-                        console.warn("Realtime socket error:", payload?.message || parsed);
                         return;
                     }
 
-                    if (parsed.type === "pong" || parsed.type === "subscribed" || parsed.type === "unsubscribed" || parsed.type === "published" || parsed.type === "message_sent") {
+                    if (
+                        parsed.type === "pong" ||
+                        parsed.type === "subscribed" ||
+                        parsed.type === "unsubscribed" ||
+                        parsed.type === "published" ||
+                        parsed.type === "message_sent"
+                    ) {
                         return;
                     }
 
@@ -126,8 +140,8 @@ export function useRealtime() {
                             addFeedUpdates(normalizedItems.length);
                         }
                     }
-                } catch (error) {
-                    console.warn("Realtime message parsing failed:", error);
+                } catch {
+                    return;
                 }
             };
 
