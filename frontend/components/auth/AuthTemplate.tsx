@@ -12,6 +12,20 @@ type AuthVariant = "login" | "register" | "mfa" | "forgot";
 const registerRoles = ["Shopper", "Creator", "Merchant"] as const;
 type Role = (typeof registerRoles)[number];
 
+function normalizeRole(role?: string): Role {
+    if (!role) return "Shopper";
+
+    switch (role.toLowerCase()) {
+        case "creator":
+            return "Creator";
+        case "merchant":
+            return "Merchant";
+        case "shopper":
+        default:
+            return "Shopper";
+    }
+}
+
 function persistAuthResponse(response: any) {
     if (!response || typeof window === "undefined") return;
 
@@ -50,8 +64,10 @@ function AuthIllustration() {
 
 export default function AuthTemplate({
     variant = "login",
+    initialRole,
 }: {
     variant?: AuthVariant;
+    initialRole?: Role | string;
 }) {
     const router = useRouter();
 
@@ -59,7 +75,7 @@ export default function AuthTemplate({
     const [password, setPassword] = useState("");
     const [otp, setOtp] = useState("");
     const [remember, setRemember] = useState(false);
-    const [selectedRole, setSelectedRole] = useState<Role>("Shopper");
+    const [selectedRole, setSelectedRole] = useState<Role>(normalizeRole(initialRole));
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -186,8 +202,8 @@ export default function AuthTemplate({
                                         type="button"
                                         onClick={() => setSelectedRole(role)}
                                         className={`rounded-3xl border px-4 py-3 ${selectedRole === role
-                                                ? "border-fuchsia-400 bg-fuchsia-500/10"
-                                                : "border-white/10"
+                                            ? "border-fuchsia-400 bg-fuchsia-500/10"
+                                            : "border-white/10"
                                             }`}
                                     >
                                         {role}

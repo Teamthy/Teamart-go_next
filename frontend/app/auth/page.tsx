@@ -15,22 +15,22 @@ export default function AuthLanding() {
                     <RoleCard
                         title="Customer"
                         description="Shop, follow creators, join livestreams, and leave reviews."
-                        requirements="Email verification required."
-                        cta="Create account"
+                        requirements={["Email verification required."]}
+                        ctaLabel="Create account"
                         href="/auth/customer/first-name"
                     />
                     <RoleCard
                         title="Creator"
                         description="Apply to host livestreams, launch drops, and grow your audience."
-                        requirements="Customer account required."
-                        cta="Apply as creator"
+                        requirements={["Customer account required."]}
+                        ctaLabel="Apply as creator"
                         href="/auth/creator/start"
                     />
                     <RoleCard
                         title="Merchant"
                         description="Open a store, manage products, and access merchant analytics."
-                        requirements="Customer account required."
-                        cta="Open merchant store"
+                        requirements={["Customer account required."]}
+                        ctaLabel="Open merchant store"
                         href="/auth/merchant/start"
                     />
                 </div>

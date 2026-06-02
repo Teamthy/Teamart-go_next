@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import * as api from "@/lib/api";
 
 export interface User {
@@ -18,74 +18,92 @@ export interface AuthState {
     isAuthenticated: boolean;
 }
 
-export function useAuth() {
-    const [state, setState] = useState<AuthState>({
-        user: null,
-        isLoading: false,
-        error: null,
-        isAuthenticated: false,
-    });
+type AuthResponse = {
+    user?: User;
+    session_id?: string;
+    access_token?: string;
+    refresh_token?: string;
+    requires_mfa?: boolean;
+    requiresMFA?: boolean;
+};
 
-    const persistAuthState = (response: any) => {
-        if (typeof window === "undefined") {
-            return response?.user ?? null;
-        }
+function getErrorMessage(error: unknown, fallback: string) {
+    if (error instanceof Error) return error.message;
+    if (typeof error === "string") return error;
+    return fallback;
+}
 
-        const user = response?.user ?? null;
-        const sessionId = response?.session_id;
+function buildInitialAuthState(): AuthState {
+    if (typeof window === "undefined") {
+        return {
+            user: null,
+            isLoading: false,
+            error: null,
+            isAuthenticated: false,
+        };
+    }
 
-        if (user) {
-            localStorage.setItem("user", JSON.stringify(user));
-        }
+    const userStr = localStorage.getItem("user");
+    const sessionId = localStorage.getItem("session_id");
 
-        if (sessionId) {
-            localStorage.setItem("session_id", sessionId);
-        }
-
-        if (response?.access_token) {
-            localStorage.setItem("access_token", response.access_token);
-        }
-
-        if (response?.refresh_token) {
-            localStorage.setItem("refresh_token", response.refresh_token);
-        }
-
-        localStorage.setItem("session", JSON.stringify(response));
-
-        return user;
-    };
-
-    // Initialize from localStorage
-    useEffect(() => {
-        const userStr = localStorage.getItem("user");
-        const sessionId = localStorage.getItem("session_id");
-
-        if (userStr) {
-            try {
-                const user = JSON.parse(userStr);
-                setState({
-                    user,
+    if (userStr) {
+        try {
+            const parsed = JSON.parse(userStr);
+            if (parsed && typeof parsed === "object") {
+                return {
+                    user: parsed as User,
                     isLoading: false,
                     error: null,
                     isAuthenticated: true,
-                });
-            } catch (e) {
-                localStorage.removeItem("user");
-                localStorage.removeItem("session_id");
-                localStorage.removeItem("access_token");
+                };
             }
-            return;
+        } catch {
+            localStorage.removeItem("user");
+            localStorage.removeItem("session_id");
+            localStorage.removeItem("access_token");
+            localStorage.removeItem("refresh_token");
         }
+    }
 
-        if (sessionId) {
-            setState({
-                user: null,
-                isLoading: false,
-                error: null,
-                isAuthenticated: true,
-            });
-        }
-    }, []);
+    return {
+        user: null,
+        isLoading: false,
+        error: null,
+        isAuthenticated: Boolean(sessionId),
+    };
+}
+
+function persistAuthState(response: AuthResponse | null) {
+    if (typeof window === "undefined" || response === null) {
+        return response?.user ?? null;
+    }
+
+    const user = response.user ?? null;
+    const sessionId = response.session_id;
+
+    if (user) {
+        localStorage.setItem("user", JSON.stringify(user));
+    }
+
+    if (sessionId) {
+        localStorage.setItem("session_id", sessionId);
+    }
+
+    if (response.access_token) {
+        localStorage.setItem("access_token", response.access_token);
+    }
+
+    if (response.refresh_token) {
+        localStorage.setItem("refresh_token", response.refresh_token);
+    }
+
+    localStorage.setItem("session", JSON.stringify(response));
+
+    return user;
+}
+
+export function useAuth() {
+    const [state, setState] = useState<AuthState>(buildInitialAuthState());
 
     const login = async (email: string, password: string) => {
         setState((prev) => ({ ...prev, isLoading: true, error: null }));
@@ -101,8 +119,8 @@ export function useAuth() {
             });
 
             return response;
-        } catch (err: any) {
-            const error = err.message || "Login failed";
+        } catch (err: unknown) {
+            const error = getErrorMessage(err, "Login failed");
             setState((prev) => ({ ...prev, isLoading: false, error }));
             throw err;
         }
@@ -122,19 +140,22 @@ export function useAuth() {
             });
 
             return response;
-        } catch (err: any) {
-            const error = err.message || "Signup failed";
+        } catch (err: unknown) {
+            const error = getErrorMessage(err, "Signup failed");
             setState((prev) => ({ ...prev, isLoading: false, error }));
             throw err;
         }
     };
 
     const logout = () => {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
-        localStorage.removeItem("session_id");
-        localStorage.removeItem("session");
-        localStorage.removeItem("user");
+        if (typeof window !== "undefined") {
+            localStorage.removeItem("access_token");
+            localStorage.removeItem("refresh_token");
+            localStorage.removeItem("session_id");
+            localStorage.removeItem("session");
+            localStorage.removeItem("user");
+        }
+
         setState({
             user: null,
             isLoading: false,
@@ -157,8 +178,8 @@ export function useAuth() {
             });
 
             return response;
-        } catch (err: any) {
-            const error = err.message || "OTP verification failed";
+        } catch (err: unknown) {
+            const error = getErrorMessage(err, "OTP verification failed");
             setState((prev) => ({ ...prev, isLoading: false, error }));
             throw err;
         }

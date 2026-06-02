@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getStoredCustomer, hasRole, type RoleKey } from "@/lib/auth-state";
 
@@ -16,29 +16,31 @@ export default function RouteGuard({
     redirectTo = "/auth/onboarding",
 }: RouteGuardProps) {
     const router = useRouter();
-    const [ready, setReady] = useState(false);
+    const [hydrated, setHydrated] = useState(false);
 
     useEffect(() => {
-        const customer = getStoredCustomer();
+        setHydrated(true);
+    }, []);
 
-        if (!customer) {
+    const customer = useMemo(() => {
+        if (typeof window === "undefined") return null;
+        return getStoredCustomer();
+    }, []);
+
+    const hasAccess = useMemo(
+        () => Boolean(customer && (!requiredRole || hasRole(requiredRole))),
+        [customer, requiredRole]
+    );
+
+    useEffect(() => {
+        if (hydrated && !hasAccess) {
             router.replace(redirectTo);
-            return;
         }
+    }, [hydrated, hasAccess, redirectTo, router]);
 
-        if (requiredRole && !hasRole(requiredRole)) {
-            router.replace(redirectTo);
-            return;
-        }
-
-        setReady(true);
-    }, [redirectTo, requiredRole, router]);
-
-    if (!ready) {
+    if (!hydrated || !hasAccess) {
         return (
-            <div className="py-10 text-sm text-zinc-500">
-                Checking your access...
-            </div>
+            <div className="py-10 text-sm text-zinc-500">Checking your access…</div>
         );
     }
 
