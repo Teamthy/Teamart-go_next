@@ -6,6 +6,7 @@ import type {
     LiveRoomDetails,
     LiveRoomSummary,
     ProductDetail,
+    StoreSummary,
 } from "@/types/commerce";
 
 export const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
@@ -520,6 +521,14 @@ export async function listStores(merchantId: number) {
     return request(`/api/v1/merchants/${merchantId}/stores`, { method: "GET" });
 }
 
+export async function listPublicStores(): Promise<{ stores: StoreSummary[]; total?: number }> {
+    return request<{ stores: StoreSummary[]; total?: number }>("/stores", { method: "GET" });
+}
+
+export async function getStoreBySlug(slug: string): Promise<StoreSummary> {
+    return request<StoreSummary>(`/stores/${encodeURIComponent(slug)}`, { method: "GET" });
+}
+
 export async function addStaff(merchantId: number, data: Record<string, unknown>) {
     return request(`/api/v1/merchants/${merchantId}/staff`, {
         method: "POST",
@@ -706,7 +715,7 @@ export async function chatLiveRoom(roomId: string, message: string): Promise<Liv
 }
 
 export async function getProductDetail(productId: number): Promise<ProductDetail> {
-    return request<ProductDetail>(`/api/products/${productId}`, {
+    return request<ProductDetail>(`/products/${productId}`, {
         method: "GET",
     });
 }
@@ -714,7 +723,7 @@ export async function getProductDetail(productId: number): Promise<ProductDetail
 export async function addCartItem(payload: CartPayload) {
     return request<{ success: boolean; cart_id?: number }>("/api/cart", {
         method: "POST",
-        body: payload,
+        body: payload as unknown as JsonBody,
     });
 }
 

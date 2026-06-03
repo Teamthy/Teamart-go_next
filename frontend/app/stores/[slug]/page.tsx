@@ -5,18 +5,40 @@ import Button from "@/components/ui/button";
 import Card from "@/components/ui/card";
 import StatCard from "@/components/ui/StatCard";
 import ProductCard from "@/components/product/ProductCard";
-import { products } from "@/lib/mock/products";
-import { stores } from "@/lib/mock/stores";
+import * as api from "@/lib/api";
+import type { StoreSummary } from "@/types/commerce";
+import type { Product } from "@/types/product";
 
-export default async function StoreDetailPage({ params }: { params: Promise<{ slug: string }> }) {
-    const { slug } = await params;
-    const store = stores.find((item) => item.slug === slug);
+export default async function StoreDetailPage({ params }: { params: { slug: string } }) {
+    const { slug } = params;
+
+    let store: StoreSummary | null = null;
+    try {
+        store = await api.getStoreBySlug(slug);
+    } catch {
+        notFound();
+    }
 
     if (!store) {
         notFound();
     }
 
-    const featuredProducts = products.filter((item) => item.merchant === store.name).slice(0, 4);
+    let featuredProducts: Product[] = [];
+    try {
+        const response = await api.listProducts(4, 0);
+        featuredProducts = (response.products || []).map((product: { id: number | string; name: string; description?: string; price: number | string; image_url?: string }) => {
+            const normalizedPrice = typeof product.price === "number" ? product.price : Number(product.price || 0);
+            return {
+                id: String(product.id),
+                name: product.name,
+                description: product.description ?? "Explore this featured product.",
+                price: `$${normalizedPrice.toFixed(2)}`,
+                image: product.image_url ?? "/images/placeholder-product.png",
+            };
+        });
+    } catch {
+        featuredProducts = [];
+    }
 
     return (
         <div className="space-y-8 pb-10">
@@ -43,7 +65,7 @@ export default async function StoreDetailPage({ params }: { params: Promise<{ sl
 
             <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
                 <Card className="overflow-hidden p-0">
-                    <img src={store.banner} alt={store.name} className="h-64 w-full object-cover" />
+                    <img src={store.banner_url} alt={store.name} className="h-64 w-full object-cover" />
                     <div className="p-5">
                         <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">About the store</p>
                         <h2 className="mt-3 text-xl font-semibold text-zinc-900">Live-first merchandising with premium storytelling</h2>
@@ -56,9 +78,9 @@ export default async function StoreDetailPage({ params }: { params: Promise<{ sl
                     <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">Store highlights</p>
                     <div className="mt-4 space-y-3">
                         {[
-                            `Creator: ${store.creator}`,
-                            `Live status: ${store.live}`,
-                            `Products: ${store.products}`,
+                            `Creator: ${store.name}`,
+                            `Live status: ${store.live_status}`,
+                            `Products: ${String(store.products)}`,
                             `Audience: ${store.followers}`,
                         ].map((item) => (
                             <div key={item} className="rounded-[24px] bg-[#FFF8FB] px-4 py-3 text-sm text-zinc-700">
@@ -87,7 +109,7 @@ export default async function StoreDetailPage({ params }: { params: Promise<{ sl
                 </div>
                 <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
                     {featuredProducts.map((product) => (
-                        <ProductCard key={product.id} product={product} />
+                        <ProductCard key={product.id} product={product} showDetailLink={false} />
                     ))}
                 </div>
             </section>

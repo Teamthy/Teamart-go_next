@@ -74,11 +74,13 @@ func SetupHandlers(
 	orderHandler := NewOrderHandler(orderService, log)
 	merchantHandler := NewMerchantHandler(merchantService, staffService, tenantService, log)
 	tenantHandler := NewTenantHandler(merchantService, staffService, tenantService, log)
+	storeHandler := NewStoreHandler(log)
 
 	// Register routes
 	RegisterUserRoutes(mux, userHandler)
 	RegisterProductRoutes(mux, productHandler)
 	RegisterOrderRoutes(mux, orderHandler)
+	RegisterStoreRoutes(mux, storeHandler)
 	RegisterMerchantRoutes(mux, merchantHandler)
 	RegisterTenantRoutes(mux, tenantHandler)
 

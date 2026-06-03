@@ -45,12 +45,92 @@ type GetStoreResponse struct {
 	StoreID     int64  `json:"store_id"`
 	OwnerID     int64  `json:"owner_id"`
 	Name        string `json:"name"`
+	Slug        string `json:"slug"`
 	Description string `json:"description"`
 	Category    string `json:"category"`
 	BannerURL   string `json:"banner_url"`
+	Tagline     string `json:"tagline"`
+	Followers   string `json:"followers"`
+	Rating      string `json:"rating"`
+	LiveStatus  string `json:"live_status"`
+	Products    int    `json:"products"`
 	Status      string `json:"status"`
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
+}
+
+func sampleStoreData() []GetStoreResponse {
+	return []GetStoreResponse{
+		{
+			StoreID:     1001,
+			OwnerID:     501,
+			Name:        "Luma Home",
+			Slug:        "luma-home",
+			Description: "Comfort-first essentials with giftable bundles and live shopper moments.",
+			Category:    "Home & wellness",
+			BannerURL:   "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=1200&q=80",
+			Tagline:     "Comfort-first essentials with giftable bundles and live shopper moments.",
+			Followers:   "28K",
+			Rating:      "4.9",
+			LiveStatus:  "Live now",
+			Products:    34,
+			Status:      "active",
+			CreatedAt:   time.Now().Format(time.RFC3339),
+			UpdatedAt:   time.Now().Format(time.RFC3339),
+		},
+		{
+			StoreID:     1002,
+			OwnerID:     502,
+			Name:        "Glow Lab",
+			Slug:        "glow-lab",
+			Description: "Skincare and beauty bundles that convert well during creator-led product pins.",
+			Category:    "Beauty & wellness",
+			BannerURL:   "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=1200&q=80",
+			Tagline:     "Skincare and beauty bundles that convert well during creator-led product pins.",
+			Followers:   "42K",
+			Rating:      "4.8",
+			LiveStatus:  "Today 8 PM",
+			Products:    29,
+			Status:      "active",
+			CreatedAt:   time.Now().Format(time.RFC3339),
+			UpdatedAt:   time.Now().Format(time.RFC3339),
+		},
+		{
+			StoreID:     1003,
+			OwnerID:     503,
+			Name:        "Northstar Merch",
+			Slug:        "northstar-merch",
+			Description: "Street-ready editorials and limited drops built for fast-moving audience interest.",
+			Category:    "Fashion",
+			BannerURL:   "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?w=1200&q=80",
+			Tagline:     "Street-ready editorials and limited drops built for fast-moving audience interest.",
+			Followers:   "51K",
+			Rating:      "4.7",
+			LiveStatus:  "Tomorrow 6 PM",
+			Products:    41,
+			Status:      "active",
+			CreatedAt:   time.Now().Format(time.RFC3339),
+			UpdatedAt:   time.Now().Format(time.RFC3339),
+		},
+	}
+}
+
+func findStoreBySlug(slug string) *GetStoreResponse {
+	for _, store := range sampleStoreData() {
+		if store.Slug == slug {
+			return &store
+		}
+	}
+	return nil
+}
+
+func findStoreByID(storeID int64) *GetStoreResponse {
+	for _, store := range sampleStoreData() {
+		if store.StoreID == storeID {
+			return &store
+		}
+	}
+	return nil
 }
 
 // UpdateStoreRequest represents the request body for store update
@@ -131,44 +211,26 @@ func (h *StoreHandler) HandleCreateStore(w http.ResponseWriter, r *http.Request)
 func (h *StoreHandler) HandleGetStore(w http.ResponseWriter, r *http.Request) {
 	h.logger.Debugf("handling get store request")
 
-	user, ok := r.Context().Value("user").(*auth.CustomClaims)
-	if !ok || user == nil {
-		h.respondError(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
 	storeIDStr := r.PathValue("store_id")
 	if storeIDStr == "" {
 		h.respondError(w, "Missing store_id parameter", http.StatusBadRequest)
 		return
 	}
 
-	storeID, err := strconv.ParseInt(storeIDStr, 10, 64)
-	if err != nil {
-		h.respondError(w, "Invalid store_id", http.StatusBadRequest)
+	var store *GetStoreResponse
+	if storeID, err := strconv.ParseInt(storeIDStr, 10, 64); err == nil {
+		store = findStoreByID(storeID)
+	} else {
+		store = findStoreBySlug(storeIDStr)
+	}
+
+	if store == nil {
+		h.respondError(w, "Store not found", http.StatusNotFound)
 		return
 	}
 
-	// Get tenant context (user owns their own stores)
-	tenantID, ok := middleware.GetTenantID(r)
-	if !ok || tenantID != user.UserID {
-		h.respondError(w, "Forbidden: you cannot access this store", http.StatusForbidden)
-		return
-	}
-
-	// TODO: Query store from database
-	// For now, return mock response
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(GetStoreResponse{
-		StoreID:     storeID,
-		OwnerID:     user.UserID,
-		Name:        "Sample Store",
-		Description: "A sample store",
-		Category:    "electronics",
-		Status:      "active",
-		CreatedAt:   time.Now().Format(time.RFC3339),
-		UpdatedAt:   time.Now().Format(time.RFC3339),
-	})
+	json.NewEncoder(w).Encode(store)
 }
 
 // HandleUpdateStore handles PUT /stores/{store_id} request
@@ -236,23 +298,15 @@ func (h *StoreHandler) HandleUpdateStore(w http.ResponseWriter, r *http.Request)
 func (h *StoreHandler) HandleListStores(w http.ResponseWriter, r *http.Request) {
 	h.logger.Debugf("handling list stores request")
 
-	user, ok := r.Context().Value("user").(*auth.CustomClaims)
-	if !ok || user == nil {
-		h.respondError(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	// TODO: Query stores from database for this user
-	// For now, return empty list
-	stores := []GetStoreResponse{}
+	stores := sampleStoreData()
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"stores": stores,
-		"total":  0,
+		"total":  len(stores),
 	})
 
-	h.logger.Infof("listed stores for user %d", user.UserID)
+	h.logger.Infof("listed public stores")
 }
 
 // ===== Helper Functions =====
@@ -268,7 +322,7 @@ func (h *StoreHandler) respondError(w http.ResponseWriter, message string, statu
 }
 
 // RegisterStoreRoutes registers all store management routes
-func RegisterStoreRoutes(mux *http.ServeMux, handler *StoreHandler) {
+func RegisterStoreRoutes(mux Router, handler *StoreHandler) {
 	mux.HandleFunc("GET /stores", handler.HandleListStores)
 	mux.HandleFunc("POST /stores", handler.HandleCreateStore)
 	mux.HandleFunc("GET /stores/{store_id}", handler.HandleGetStore)

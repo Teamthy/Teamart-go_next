@@ -81,6 +81,26 @@ export interface LiveRoomDetails extends LiveRoomSummary {
     pinned_products: FeedProduct[];
 }
 
+export interface StoreSummary {
+    id: number;
+    owner_id: number;
+    name: string;
+    description: string;
+    category: string;
+    banner_url: string;
+    status: string;
+    created_at: string;
+    updated_at: string;
+    slug: string;
+    tagline: string;
+    followers: string;
+    rating: string;
+    live_status: string;
+    products: number;
+}
+
+export interface StoreDetails extends StoreSummary { }
+
 export interface ProductVariant {
     id: number;
     name: string;

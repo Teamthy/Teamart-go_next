@@ -21,7 +21,7 @@ export default function ProductCard({
                 <p className="text-sm leading-6 text-slate-500">{product.description}</p>
                 {showDetailLink && (
                     <Link
-                        href={`/product/${product.id}`}
+                        href={`/products/${product.id}`}
                         className="inline-flex items-center rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
                     >
                         View details
