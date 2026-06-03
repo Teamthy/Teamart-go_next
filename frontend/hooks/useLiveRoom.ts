@@ -18,7 +18,7 @@ export function useLiveRoom(roomId: string) {
     const reactionMutation = useMutation({
         mutationFn: async (reaction: string) => api.reactLiveRoom(roomId, reaction),
         onMutate: async (reaction) => {
-            await queryClient.cancelQueries(["liveRoom", roomId]);
+            await queryClient.cancelQueries({ queryKey: ["liveRoom", roomId], exact: true });
             const previousRoom = queryClient.getQueryData<LiveRoomDetails>(["liveRoom", roomId]);
             if (previousRoom) {
                 const nextReactions = {
@@ -38,13 +38,13 @@ export function useLiveRoom(roomId: string) {
                 queryClient.setQueryData(["liveRoom", roomId], context.previousRoom);
             }
         },
-        onSettled: () => queryClient.invalidateQueries(["liveRoom", roomId]),
+        onSettled: () => queryClient.invalidateQueries({ queryKey: ["liveRoom", roomId], exact: true }),
     });
 
     const chatMutation = useMutation({
         mutationFn: async (message: string) => await api.chatLiveRoom(roomId, message),
         onMutate: async (message) => {
-            await queryClient.cancelQueries(["liveRoom", roomId]);
+            await queryClient.cancelQueries({ queryKey: ["liveRoom", roomId], exact: true });
             const previousRoom = queryClient.getQueryData<LiveRoomDetails>(["liveRoom", roomId]);
             if (previousRoom) {
                 const newMessage: LiveChatMessage = {
@@ -67,7 +67,7 @@ export function useLiveRoom(roomId: string) {
                 queryClient.setQueryData(["liveRoom", roomId], context.previousRoom);
             }
         },
-        onSettled: () => queryClient.invalidateQueries(["liveRoom", roomId]),
+        onSettled: () => queryClient.invalidateQueries({ queryKey: ["liveRoom", roomId], exact: true }),
     });
 
     return {
@@ -76,9 +76,9 @@ export function useLiveRoom(roomId: string) {
         isError: roomQuery.isError,
         error: roomQuery.error?.message ?? null,
         sendReaction: reactionMutation.mutate,
-        isReacting: reactionMutation.isLoading,
+        isReacting: reactionMutation.isPending,
         sendChat: chatMutation.mutate,
-        isChatting: chatMutation.isLoading,
+        isChatting: chatMutation.isPending,
         refetchRoom: roomQuery.refetch,
     };
 }
