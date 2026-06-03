@@ -1,0 +1,163 @@
+/**
+ * Email Verification Page
+ * OTP verification with resend logic
+ */
+
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useAuthStore } from "@/store/useAuthStore";
+import PremiumAuthLayout from "@/components/auth/PremiumAuthLayout";
+import OTPInput from "@/components/auth/OTPInput";
+import { Mail, AlertCircle } from "lucide-react";
+
+export default function VerifyEmailPage() {
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const { verifyOTP } = useAuthStore();
+
+    const email = searchParams.get("email") || "";
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [resendCountdown, setResendCountdown] = useState(0);
+    const [resendAttempts, setResendAttempts] = useState(0);
+
+    // Resend countdown timer
+    useEffect(() => {
+        if (resendCountdown > 0) {
+            const timer = setTimeout(() => setResendCountdown(resendCountdown - 1), 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [resendCountdown]);
+
+    const handleOTPComplete = async (code: string) => {
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            const success = await verifyOTP(code);
+            if (success) {
+                // Navigate to profile setup
+                router.push("/auth/onboarding/profile");
+            } else {
+                setError("Invalid verification code. Please try again.");
+            }
+        } catch (err) {
+            setError(
+                err instanceof Error ? err.message : "Failed to verify code. Please try again."
+            );
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleResendOTP = async () => {
+        if (resendCountdown > 0 || resendAttempts >= 3) return;
+
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            // Simulate API call - would call backend in production
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            setResendCountdown(60);
+            setResendAttempts(resendAttempts + 1);
+        } catch (err) {
+            setError("Failed to resend code. Please try again.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return (
+        <PremiumAuthLayout
+            title="Verify Your Email"
+            description={`We sent a 6-digit code to ${email || "your email"}. Enter it below.`}
+            variant="compact"
+            showBackButton
+            backHref="/auth/signup"
+        >
+            <div className="space-y-6">
+                {/* Email display */}
+                <div className="flex items-center justify-center gap-2 rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-900 border border-blue-200">
+                    <Mail className="h-4 w-4 flex-shrink-0" />
+                    <div>
+                        <p className="font-semibold">{email}</p>
+                        <p className="text-xs text-blue-800">
+                            {resendAttempts === 0 ? "Check your inbox and spam folder" : "Code resent successfully"}
+                        </p>
+                    </div>
+                </div>
+
+                {/* OTP Input */}
+                <OTPInput
+                    onComplete={handleOTPComplete}
+                    isLoading={isLoading}
+                    error={error}
+                    length={6}
+                    autoFocus
+                />
+
+                {/* Error message */}
+                {error && (
+                    <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+                        <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                        <div>
+                            <p className="font-semibold">{error}</p>
+                            {error.includes("Invalid") && (
+                                <p className="text-xs text-red-800 mt-1">
+                                    Make sure you entered all 6 digits correctly.
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Resend section */}
+                <div className="space-y-3 border-t border-zinc-200 pt-4">
+                    <p className="text-sm text-zinc-600">Didn't receive the code?</p>
+
+                    {resendCountdown > 0 ? (
+                        <div className="text-center">
+                            <p className="text-sm font-semibold text-zinc-900">
+                                Request new code in <span className="text-pink-600">{resendCountdown}s</span>
+                            </p>
+                        </div>
+                    ) : resendAttempts >= 3 ? (
+                        <div className="rounded-lg bg-amber-50 p-4 border border-amber-200">
+                            <p className="text-sm text-amber-900 font-semibold">Too many attempts</p>
+                            <p className="text-xs text-amber-800 mt-1">
+                                Please contact support if you continue to have issues.
+                            </p>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={handleResendOTP}
+                            disabled={isLoading || resendCountdown > 0}
+                            className="w-full rounded-lg border-2 border-pink-300 px-4 py-2.5 font-semibold text-pink-600 transition-all hover:bg-pink-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Send Code Again
+                        </button>
+                    )}
+
+                    {resendAttempts > 0 && resendAttempts < 3 && (
+                        <p className="text-xs text-zinc-500 text-center">
+                            Resend attempts: {resendAttempts}/3
+                        </p>
+                    )}
+                </div>
+
+                {/* Help text */}
+                <div className="rounded-lg bg-zinc-100 p-4 text-xs text-zinc-700 space-y-2">
+                    <p className="font-semibold">💡 Tips:</p>
+                    <ul className="space-y-1 ml-2">
+                        <li>• Check your spam or promotions folder</li>
+                        <li>• Code expires in 10 minutes</li>
+                        <li>• You can paste the code directly</li>
+                    </ul>
+                </div>
+            </div>
+        </PremiumAuthLayout>
+    );
+}

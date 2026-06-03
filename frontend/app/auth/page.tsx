@@ -1,41 +1,91 @@
 
-import PageHeader from "@/components/ui/PageHeader";
-import RoleCard from "@/components/ui/RoleCard";
+/**
+ * Auth Role Selector Page
+ * Choose between Customer, Creator, or Merchant signup paths
+ */
 
-export default function AuthLanding() {
+"use client";
+
+import React from "react";
+import { useRouter } from "next/navigation";
+import PremiumAuthLayout from "@/components/auth/PremiumAuthLayout";
+import RoleSelectorCard from "@/components/auth/RoleSelectorCard";
+import { ShoppingBag, Sparkles, Store } from "lucide-react";
+
+export default function AuthPage() {
+    const router = useRouter();
+
+    const roles = [
+        {
+            id: "customer",
+            title: "Buyer",
+            description: "Discover products and shop from creators",
+            benefits: [
+                "Browse curated product collections",
+                "Follow favorite creators",
+                "Get personalized recommendations",
+                "Shop securely with buyer protection",
+            ],
+            icon: <ShoppingBag className="h-8 w-8" />,
+        },
+        {
+            id: "creator",
+            title: "Creator",
+            description: "Build your audience and monetize your content",
+            benefits: [
+                "Go live and sell products in real-time",
+                "Earn from live streams and sales",
+                "Access creator analytics",
+                "Get dedicated support",
+            ],
+            icon: <Sparkles className="h-8 w-8" />,
+        },
+        {
+            id: "merchant",
+            title: "Seller",
+            description: "Reach millions of buyers and grow your business",
+            benefits: [
+                "Unlimited product listings",
+                "Advanced seller analytics",
+                "Fulfillment support",
+                "Marketing tools included",
+            ],
+            icon: <Store className="h-8 w-8" />,
+        },
+    ];
+
     return (
-        <div className="min-h-screen bg-[#F9F5F8] px-4 py-10 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-4xl space-y-10">
-                <PageHeader
-                    eyebrow="Sign in or join"
-                    title="Welcome to Teamart Social Commerce"
-                    description="Choose your path: customer, creator, or merchant."
-                />
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    <RoleCard
-                        title="Customer"
-                        description="Shop, follow creators, join livestreams, and leave reviews."
-                        requirements={["Email verification required."]}
-                        ctaLabel="Create account"
-                        href="/auth/customer/first-name"
+        <PremiumAuthLayout
+            title="Choose Your Path"
+            description="Join Teamart as a buyer, creator, or seller. You can always add more roles later."
+            variant="wide"
+        >
+            <div className="grid gap-6 sm:grid-cols-1 lg:grid-cols-3">
+                {roles.map((role) => (
+                    <RoleSelectorCard
+                        key={role.id}
+                        role={role.id as "customer" | "creator" | "merchant"}
+                        title={role.title}
+                        description={role.description}
+                        benefits={role.benefits}
+                        icon={role.icon}
+                        href={`/auth/signup?role=${role.id}`}
                     />
-                    <RoleCard
-                        title="Creator"
-                        description="Apply to host livestreams, launch drops, and grow your audience."
-                        requirements={["Customer account required."]}
-                        ctaLabel="Apply as creator"
-                        href="/auth/creator/start"
-                    />
-                    <RoleCard
-                        title="Merchant"
-                        description="Open a store, manage products, and access merchant analytics."
-                        requirements={["Customer account required."]}
-                        ctaLabel="Open merchant store"
-                        href="/auth/merchant/start"
-                    />
-                </div>
+                ))}
             </div>
-        </div>
+
+            {/* Login link */}
+            <div className="mt-8 text-center">
+                <p className="text-sm text-zinc-600">
+                    Already have an account?{" "}
+                    <button
+                        onClick={() => router.push("/auth/login")}
+                        className="font-semibold text-pink-600 hover:text-pink-700"
+                    >
+                        Sign in
+                    </button>
+                </p>
+            </div>
+        </PremiumAuthLayout>
     );
 }
-// End of new role-based cards section
