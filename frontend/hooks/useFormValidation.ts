@@ -8,12 +8,12 @@
 import { useCallback } from "react";
 import { useForm, UseFormProps, FieldValues, UseFormReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ZodSchema } from "zod";
+import { type ZodType, type input } from "zod";
 
-interface UseFormValidationProps<T extends FieldValues>
-    extends Omit<UseFormProps<T>, "resolver"> {
-    schema: ZodSchema;
-    onSubmit: (data: T) => Promise<void> | void;
+interface UseFormValidationProps<S extends ZodType<any, FieldValues>>
+    extends Omit<UseFormProps<input<S>>, "resolver"> {
+    schema: S;
+    onSubmit: (data: input<S>) => Promise<void> | void;
 }
 
 /**
@@ -23,22 +23,22 @@ interface UseFormValidationProps<T extends FieldValues>
  * @param options - Additional React Hook Form options
  * @returns Form methods from React Hook Form
  */
-export function useFormValidation<T extends FieldValues>({
+export function useFormValidation<S extends ZodType<any, FieldValues>>({
     schema,
     onSubmit,
     ...options
-}: UseFormValidationProps<T>): UseFormReturn<T> & {
-    onSubmitHandler: (data: T) => Promise<void>;
+}: UseFormValidationProps<S>): UseFormReturn<input<S>> & {
+    onSubmitHandler: (data: input<S>) => Promise<void>;
     isSubmitting: boolean;
 } {
-    const form = useForm<T>({
-        resolver: zodResolver(schema),
+    const form = useForm<input<S>>({
+        resolver: zodResolver(schema, undefined, { raw: true }),
         mode: "onChange",
         ...options,
     });
 
     const onSubmitHandler = useCallback(
-        async (data: T) => {
+        async (data: input<S>) => {
             try {
                 form.clearErrors();
                 await Promise.resolve(onSubmit(data));

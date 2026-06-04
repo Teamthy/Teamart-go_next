@@ -13,6 +13,7 @@ import { loginSchema } from "@/schemas/auth.schema";
 import { useAuthStore } from "@/store/useAuthStore";
 import PremiumAuthLayout from "@/components/auth/PremiumAuthLayout";
 import { Eye, EyeOff, AlertCircle, ArrowRight } from "lucide-react";
+import { getErrorMessage } from "@/lib/form";
 
 export default function LoginPage() {
     const router = useRouter();
@@ -57,18 +58,23 @@ export default function LoginPage() {
                                 id="email"
                                 placeholder="you@example.com"
                                 className={`w-full rounded-lg border-2 px-4 py-3 transition-all focus:outline-none ${errors.email
-                                        ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-2 focus:ring-red-100"
-                                        : "border-zinc-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
+                                    ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                                    : "border-zinc-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
                                     }`}
                                 aria-invalid={errors.email ? "true" : "false"}
                             />
                         )}
                     />
                     {errors.email && (
-                        <div className="mt-2 flex items-start gap-2 text-sm text-red-600">
-                            <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                            <span>{errors.email?.message || "Invalid email"}</span>
-                        </div>
+                        (() => {
+                            const msg = getErrorMessage(errors.email, "Invalid email");
+                            return msg ? (
+                                <div className="mt-2 flex items-start gap-2 text-sm text-red-600">
+                                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                                    <span>{msg}</span>
+                                </div>
+                            ) : null;
+                        })()
                     )}
                 </div>
 
@@ -98,8 +104,8 @@ export default function LoginPage() {
                                     id="password"
                                     placeholder="••••••••••••"
                                     className={`w-full rounded-lg border-2 px-4 py-3 pr-10 transition-all focus:outline-none font-mono text-sm ${errors.password
-                                            ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-2 focus:ring-red-100"
-                                            : "border-zinc-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
+                                        ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                                        : "border-zinc-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
                                         }`}
                                     aria-invalid={errors.password ? "true" : "false"}
                                 />
@@ -118,10 +124,15 @@ export default function LoginPage() {
                         </button>
                     </div>
                     {errors.password && (
-                        <div className="mt-2 flex items-start gap-2 text-sm text-red-600">
-                            <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                            <span>{errors.password?.message || "Invalid password"}</span>
-                        </div>
+                        (() => {
+                            const msg = getErrorMessage(errors.password, "Invalid password");
+                            return msg ? (
+                                <div className="mt-2 flex items-start gap-2 text-sm text-red-600">
+                                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                                    <span>{msg}</span>
+                                </div>
+                            ) : null;
+                        })()
                     )}
                 </div>
 

@@ -6,18 +6,49 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/useAuthStore";
+import * as api from "@/lib/api";
 import PremiumAuthLayout from "@/components/auth/PremiumAuthLayout";
 import OTPInput from "@/components/auth/OTPInput";
 import { Mail, AlertCircle } from "lucide-react";
 
 export default function VerifyEmailPage() {
     const router = useRouter();
-    const searchParams = useSearchParams();
+    const [email, setEmail] = useState<string>("");
     const { verifyOTP } = useAuthStore();
 
-    const email = searchParams.get("email") || "";
+    useEffect(() => {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const queryEmail = params.get("email") || "";
+            const stored = getPendingSessionData();
+            setEmail(queryEmail || stored.email || "");
+        } catch (e) {
+            setEmail("");
+        }
+    }, []);
+
+    function getPendingSessionData() {
+        if (typeof window === "undefined") {
+            return { session_id: null, email: null };
+        }
+
+        const raw = sessionStorage.getItem("pendingSession") || localStorage.getItem("session");
+        if (!raw) {
+            return { session_id: null, email: null };
+        }
+
+        try {
+            const parsed = JSON.parse(raw) as Record<string, unknown>;
+            return {
+                session_id: String(parsed.session_id ?? parsed.sessionID ?? "") || null,
+                email: String(parsed.email ?? parsed.user?.email ?? "") || null,
+            };
+        } catch {
+            return { session_id: null, email: null };
+        }
+    }
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [resendCountdown, setResendCountdown] = useState(0);
@@ -59,12 +90,21 @@ export default function VerifyEmailPage() {
         setError(null);
 
         try {
-            // Simulate API call - would call backend in production
-            await new Promise((resolve) => setTimeout(resolve, 1000));
+            const pending = getPendingSessionData();
+            const sessionId = pending.session_id;
+            const targetEmail = email || pending.email;
+
+            if (!sessionId || !targetEmail) {
+                throw new Error("Unable to locate verification session or email.");
+            }
+
+            await api.resendOTP(sessionId, targetEmail);
             setResendCountdown(60);
             setResendAttempts(resendAttempts + 1);
         } catch (err) {
-            setError("Failed to resend code. Please try again.");
+            setError(
+                err instanceof Error ? err.message : "Failed to resend code. Please try again."
+            );
         } finally {
             setIsLoading(false);
         }

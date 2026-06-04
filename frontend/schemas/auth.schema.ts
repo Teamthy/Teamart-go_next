@@ -133,7 +133,7 @@ export const firstProductSchema = z.object({
     name: z.string().min(1, "Product name required").max(200),
     description: z.string().max(2000),
     price: z.number().positive("Price must be positive"),
-    stock: z.number().int().non_negative("Stock must be non-negative"),
+    stock: z.number().int().nonnegative("Stock must be non-negative"),
     images: z.array(z.instanceof(File)).min(1, "At least one image required"),
 });
 

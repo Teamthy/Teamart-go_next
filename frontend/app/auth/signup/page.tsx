@@ -6,20 +6,31 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Controller } from "react-hook-form";
 import { useFormValidation } from "@/hooks/useFormValidation";
 import { signupSchema } from "@/schemas/auth.schema";
 import { useAuthStore } from "@/store/useAuthStore";
 import PremiumAuthLayout from "@/components/auth/PremiumAuthLayout";
 import { Eye, EyeOff, AlertCircle, CheckCircle2, Mail } from "lucide-react";
+import { getErrorMessage } from "@/lib/form";
 
 export default function SignupPage() {
     const router = useRouter();
-    const searchParams = useSearchParams();
     const { signup } = useAuthStore();
 
-    const role = (searchParams.get("role") || "customer") as "customer" | "creator" | "merchant";
+    const [role, setRole] = useState<"customer" | "creator" | "merchant">("customer");
+
+    // Read role from URL on client-side to avoid SSR/prerender issues
+    useEffect(() => {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const r = (params.get("role") || "customer") as "customer" | "creator" | "merchant";
+            setRole(r);
+        } catch (e) {
+            setRole("customer");
+        }
+    }, []);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [passwordStrength, setPasswordStrength] = useState<"weak" | "medium" | "strong">("weak");
@@ -107,8 +118,8 @@ export default function SignupPage() {
                                     id="email"
                                     placeholder="you@example.com"
                                     className={`w-full rounded-lg border-2 px-4 py-3 pr-10 transition-all focus:outline-none ${errors.email
-                                            ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-2 focus:ring-red-100"
-                                            : "border-zinc-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
+                                        ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                                        : "border-zinc-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
                                         }`}
                                     aria-invalid={errors.email ? "true" : "false"}
                                 />
@@ -119,10 +130,15 @@ export default function SignupPage() {
                         )}
                     </div>
                     {errors.email && (
-                        <div className="mt-2 flex items-start gap-2 text-sm text-red-600">
-                            <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                            <span>{errors.email.message}</span>
-                        </div>
+                        (() => {
+                            const msg = getErrorMessage(errors.email, "Invalid email");
+                            return msg ? (
+                                <div className="mt-2 flex items-start gap-2 text-sm text-red-600">
+                                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                                    <span>{msg}</span>
+                                </div>
+                            ) : null;
+                        })()
                     )}
                 </div>
 
@@ -144,8 +160,8 @@ export default function SignupPage() {
                                         id="password"
                                         placeholder="••••••••••••"
                                         className={`w-full rounded-lg border-2 px-4 py-3 pr-10 transition-all focus:outline-none font-mono text-sm ${errors.password
-                                                ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-2 focus:ring-red-100"
-                                                : "border-zinc-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
+                                            ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                                            : "border-zinc-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
                                             }`}
                                         aria-invalid={errors.password ? "true" : "false"}
                                     />
@@ -172,14 +188,14 @@ export default function SignupPage() {
                                         <div
                                             key={level}
                                             className={`h-1 flex-1 rounded-full transition-colors ${(level === "weak" && passwordStrength) ||
-                                                    (level === "medium" && ["medium", "strong"].includes(passwordStrength)) ||
-                                                    (level === "strong" && passwordStrength === "strong")
-                                                    ? level === "weak"
-                                                        ? "bg-red-500"
-                                                        : level === "medium"
-                                                            ? "bg-yellow-500"
-                                                            : "bg-green-500"
-                                                    : "bg-zinc-200"
+                                                (level === "medium" && ["medium", "strong"].includes(passwordStrength)) ||
+                                                (level === "strong" && passwordStrength === "strong")
+                                                ? level === "weak"
+                                                    ? "bg-red-500"
+                                                    : level === "medium"
+                                                        ? "bg-yellow-500"
+                                                        : "bg-green-500"
+                                                : "bg-zinc-200"
                                                 }`}
                                         />
                                     ))}
@@ -231,8 +247,8 @@ export default function SignupPage() {
                                     id="confirmPassword"
                                     placeholder="••••••••••••"
                                     className={`w-full rounded-lg border-2 px-4 py-3 pr-10 transition-all focus:outline-none font-mono text-sm ${errors.confirmPassword
-                                            ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-2 focus:ring-red-100"
-                                            : "border-zinc-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
+                                        ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                                        : "border-zinc-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
                                         }`}
                                     aria-invalid={errors.confirmPassword ? "true" : "false"}
                                 />
@@ -251,10 +267,15 @@ export default function SignupPage() {
                         </button>
                     </div>
                     {errors.confirmPassword && (
-                        <div className="mt-2 flex items-start gap-2 text-sm text-red-600">
-                            <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                            <span>{errors.confirmPassword.message}</span>
-                        </div>
+                        (() => {
+                            const msg = getErrorMessage(errors.confirmPassword, "Passwords do not match");
+                            return msg ? (
+                                <div className="mt-2 flex items-start gap-2 text-sm text-red-600">
+                                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                                    <span>{msg}</span>
+                                </div>
+                            ) : null;
+                        })()
                     )}
                 </div>
 

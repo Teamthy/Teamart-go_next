@@ -15,6 +15,7 @@ import PremiumAuthLayout from "@/components/auth/PremiumAuthLayout";
 import UsernameChecker from "@/components/auth/UsernameChecker";
 import ProgressStepper from "@/components/auth/ProgressStepper";
 import { Camera, Upload, AlertCircle, CheckCircle2 } from "lucide-react";
+import { getErrorMessage } from "@/lib/form";
 
 export default function ProfileSetupPage() {
     const router = useRouter();
@@ -147,19 +148,24 @@ export default function ProfileSetupPage() {
                                     id="firstName"
                                     placeholder="John"
                                     className={`w-full rounded-lg border-2 px-4 py-3 transition-all focus:outline-none ${errors.firstName
-                                            ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-2 focus:ring-red-100"
-                                            : firstName
-                                                ? "border-green-300 bg-green-50 focus:border-green-400 focus:ring-2 focus:ring-green-100"
-                                                : "border-zinc-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
+                                        ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                                        : firstName
+                                            ? "border-green-300 bg-green-50 focus:border-green-400 focus:ring-2 focus:ring-green-100"
+                                            : "border-zinc-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
                                         }`}
                                 />
                             )}
                         />
                         {errors.firstName && (
-                            <p className="mt-2 text-xs text-red-600 flex items-center gap-1">
-                                <AlertCircle className="h-3 w-3" />
-                                {errors.firstName.message}
-                            </p>
+                            (() => {
+                                const msg = getErrorMessage(errors.firstName, "Invalid first name");
+                                return msg ? (
+                                    <p className="mt-2 text-xs text-red-600 flex items-center gap-1">
+                                        <AlertCircle className="h-3 w-3" />
+                                        {msg}
+                                    </p>
+                                ) : null;
+                            })()
                         )}
                     </div>
 
@@ -179,19 +185,24 @@ export default function ProfileSetupPage() {
                                     id="lastName"
                                     placeholder="Doe"
                                     className={`w-full rounded-lg border-2 px-4 py-3 transition-all focus:outline-none ${errors.lastName
-                                            ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-2 focus:ring-red-100"
-                                            : lastName
-                                                ? "border-green-300 bg-green-50 focus:border-green-400 focus:ring-2 focus:ring-green-100"
-                                                : "border-zinc-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
+                                        ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                                        : lastName
+                                            ? "border-green-300 bg-green-50 focus:border-green-400 focus:ring-2 focus:ring-green-100"
+                                            : "border-zinc-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
                                         }`}
                                 />
                             )}
                         />
                         {errors.lastName && (
-                            <p className="mt-2 text-xs text-red-600 flex items-center gap-1">
-                                <AlertCircle className="h-3 w-3" />
-                                {errors.lastName.message}
-                            </p>
+                            (() => {
+                                const msg = getErrorMessage(errors.lastName, "Invalid last name");
+                                return msg ? (
+                                    <p className="mt-2 text-xs text-red-600 flex items-center gap-1">
+                                        <AlertCircle className="h-3 w-3" />
+                                        {msg}
+                                    </p>
+                                ) : null;
+                            })()
                         )}
                     </div>
 

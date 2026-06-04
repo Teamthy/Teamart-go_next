@@ -64,7 +64,7 @@ function normalizeAuthUser(data: AuthSessionResponse): AuthUser {
         id: Number(data.user_id ?? data.user?.id ?? fallbackUser?.id ?? 0),
         email,
         name: data.user?.name || fallbackUser?.name || email.split("@")[0] || "Customer",
-        role: data.user?.role || fallbackUser?.role || "customer",
+        role: data.user?.role || (data.role as string | undefined) || fallbackUser?.role || "customer",
         created_at: data.created_at || data.user?.created_at || fallbackUser?.created_at,
     };
 }
@@ -329,20 +329,22 @@ export async function login(email: string, password: string) {
     return normalizeAuthResponse(response);
 }
 
-export async function signup(email: string, password: string) {
+export async function signup(email: string, password: string, role: string) {
     const response = await request("/auth/signup", {
         method: "POST",
-        body: { email, password },
+        body: { email, password, role },
     });
 
     return normalizeAuthResponse(response);
 }
 
-export async function verifyOTP(session_id: string, code: string) {
-    const response = await request("/sessions/validate", {
+export async function verifyOTP(session_id: string, code: string, role?: string, email?: string) {
+    const response = await request("/auth/verify-otp", {
         method: "POST",
         body: {
+            email,
             session_id,
+            role,
             code,
             user_agent: navigator.userAgent,
             ip_address: "0.0.0.0",
@@ -353,7 +355,18 @@ export async function verifyOTP(session_id: string, code: string) {
         ...response,
         user_id: response.user_id,
         session_id: response.session_id || session_id,
-        email: getStoredAuthUser()?.email || response.email,
+        email: response.email || email || getStoredAuthUser()?.email,
+        role: response.role || role,
+    });
+}
+
+export async function resendOTP(session_id: string | null, email?: string) {
+    return request("/auth/resend-otp", {
+        method: "POST",
+        body: {
+            email,
+            session_id,
+        },
     });
 }
 
