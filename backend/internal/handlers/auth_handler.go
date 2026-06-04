@@ -21,6 +21,7 @@ type AuthHandler struct {
 	sessionService  *auth.SessionService
 	tokenService    *auth.TokenService
 	redisService    *auth.RedisService
+	otpService      *auth.OTPService
 	oauthService    *authoauth.OAuthService
 	logger          *logger.Logger
 }
@@ -31,6 +32,7 @@ func NewAuthHandler(
 	sessionService *auth.SessionService,
 	tokenService *auth.TokenService,
 	redisService *auth.RedisService,
+	otpService *auth.OTPService,
 	logger *logger.Logger,
 ) *AuthHandler {
 	oauthService := authoauth.NewOAuthService(authoauth.NewMemoryStateStorage())
@@ -41,6 +43,7 @@ func NewAuthHandler(
 		sessionService:  sessionService,
 		tokenService:    tokenService,
 		redisService:    redisService,
+		otpService:      otpService,
 		oauthService:    oauthService,
 		logger:          logger,
 	}
@@ -121,15 +124,48 @@ type RefreshTokenResponse struct {
 type SignupRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
+	Role     string `json:"role,omitempty"`
 }
 
 // SignupResponse represents the HTTP response body for signup
 type SignupResponse struct {
 	UserID    int64  `json:"user_id"`
 	Email     string `json:"email"`
+	Role      string `json:"role,omitempty"`
+	SessionID string `json:"session_id,omitempty"`
 	Status    string `json:"status"`
 	Message   string `json:"message"`
 	CreatedAt string `json:"created_at"`
+}
+
+type VerifyOTPRequest struct {
+	Email     string `json:"email"`
+	SessionID string `json:"session_id,omitempty"`
+	Role      string `json:"role,omitempty"`
+	Code      string `json:"code"`
+}
+
+type VerifyOTPResponse struct {
+	UserID       int64  `json:"user_id"`
+	Email        string `json:"email,omitempty"`
+	Role         string `json:"role,omitempty"`
+	SessionID    string `json:"session_id,omitempty"`
+	AccessToken  string `json:"access_token,omitempty"`
+	RefreshToken string `json:"refresh_token,omitempty"`
+	Status       string `json:"status"`
+	Message      string `json:"message"`
+	CreatedAt    string `json:"created_at"`
+}
+
+type ResendOTPRequest struct {
+	Email     string `json:"email"`
+	SessionID string `json:"session_id,omitempty"`
+}
+
+type ResendOTPResponse struct {
+	SessionID string `json:"session_id,omitempty"`
+	ExpiresAt string `json:"expires_at"`
+	Message   string `json:"message"`
 }
 
 // LoginRequest represents the HTTP request body for user login
@@ -195,6 +231,7 @@ func (h *AuthHandler) HandleSignup(w http.ResponseWriter, r *http.Request) {
 	input := &auth.CreateIdentityInput{
 		Email:    req.Email,
 		Password: req.Password,
+		Role:     req.Role,
 	}
 
 	output, err := h.identityService.CreateIdentity(r.Context(), input)
@@ -204,11 +241,49 @@ func (h *AuthHandler) HandleSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Create a signup session so the frontend can keep track of the verification flow
+	deviceID := r.Header.Get("X-Device-ID")
+	if deviceID == "" {
+		deviceID = "web_signup"
+	}
+
+	clientIP := r.RemoteAddr
+	if req := r.Header.Get("X-Forwarded-For"); req != "" {
+		clientIP = strings.Split(req, ",")[0]
+	}
+
+	sessionOutput, err := h.sessionService.CreateSession(r.Context(), &auth.CreateSessionInput{
+		UserID:    output.Identity.ID,
+		DeviceID:  deviceID,
+		UserAgent: r.Header.Get("User-Agent"),
+		IPAddress: clientIP,
+	})
+	if err != nil {
+		h.logger.Errorf("failed to create signup session: %v", err)
+		h.respondError(w, "Failed to initialize signup session", http.StatusInternalServerError)
+		return
+	}
+
+	if h.otpService != nil {
+		otpOutput, err := h.otpService.GenerateOTP(r.Context(), &auth.GenerateOTPInput{
+			UserID:      output.Identity.ID,
+			Type:        auth.OTPTypeEmail,
+			Destination: output.Identity.Email,
+		})
+		if err != nil {
+			h.logger.Warnf("failed to generate signup OTP: %v", err)
+		} else {
+			h.logger.Infof("OTP generated for signup flow: %s", otpOutput.PlainCode)
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(SignupResponse{
 		UserID:    output.Identity.ID,
 		Email:     output.Identity.Email,
+		Role:      output.Identity.Role,
+		SessionID: sessionOutput.Session.ID,
 		Status:    string(output.Identity.AccountStatus),
 		Message:   "User created successfully. Please verify your email.",
 		CreatedAt: output.Identity.CreatedAt.Format("2006-01-02T15:04:05Z"),
@@ -311,6 +386,92 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	})
 
 	h.logger.Infof("user logged in: %d (%s) - session %s", identity.ID, req.Email, sessionOutput.Session.ID)
+}
+
+// HandleVerifyOTP handles POST /auth/verify-otp requests
+//
+//	Example: curl -X POST http://localhost:8080/auth/verify-otp \
+//	  -H "Content-Type: application/json" \
+//	  -d '{"email":"user@example.com","session_id":"abc123","code":"123456"}'
+func (h *AuthHandler) HandleVerifyOTP(w http.ResponseWriter, r *http.Request) {
+	h.logger.Debugf("handling VerifyOTP request")
+
+	var req VerifyOTPRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Errorf("failed to decode request body: %v", err)
+		h.respondError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Email == "" || req.Code == "" {
+		h.respondError(w, "Email and code are required", http.StatusBadRequest)
+		return
+	}
+
+	identity, err := h.identityService.GetIdentityByEmail(r.Context(), req.Email)
+	if err != nil {
+		h.logger.Warnf("verify OTP failed: user not found (%s)", req.Email)
+		h.respondError(w, "Invalid verification request", http.StatusUnauthorized)
+		return
+	}
+
+	if h.otpService == nil {
+		h.respondError(w, "OTP service unavailable", http.StatusInternalServerError)
+		return
+	}
+
+	verifyOutput, err := h.otpService.VerifyOTP(r.Context(), &auth.VerifyOTPInput{
+		UserID: identity.ID,
+		Code:   req.Code,
+	})
+	if err != nil || !verifyOutput.IsValid {
+		h.logger.Warnf("OTP verification failed for user %d: %v", identity.ID, err)
+		h.respondError(w, "Invalid verification code", http.StatusUnauthorized)
+		return
+	}
+
+	if identity.OnboardingState == auth.StateNew {
+		if err := h.identityService.UpdateOnboardingState(r.Context(), &auth.UpdateOnboardingStateInput{
+			UserID: identity.ID,
+			State:  auth.StateEmailVerified,
+		}); err != nil {
+			h.logger.Warnf("failed to update onboarding state: %v", err)
+		}
+	}
+
+	role := req.Role
+	if role == "" {
+		role = identity.Role
+	}
+	if role == "" {
+		role = "customer"
+	}
+
+	tokenPair, err := h.tokenService.GenerateTokenPair(r.Context(), &auth.GenerateTokenPairInput{
+		UserID:    identity.ID,
+		Email:     identity.Email,
+		SessionID: req.SessionID,
+		DeviceID:  "web_signup",
+	})
+	if err != nil {
+		h.logger.Errorf("failed to generate token pair: %v", err)
+		h.respondError(w, "Failed to complete verification", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(VerifyOTPResponse{
+		UserID:       identity.ID,
+		Email:        identity.Email,
+		Role:         role,
+		SessionID:    req.SessionID,
+		AccessToken:  tokenPair.AccessToken,
+		RefreshToken: tokenPair.RefreshToken,
+		Status:       string(identity.AccountStatus),
+		Message:      "Email verified successfully.",
+		CreatedAt:    identity.CreatedAt.Format("2006-01-02T15:04:05Z"),
+	})
 }
 
 // HandleRefresh handles POST /auth/refresh requests
@@ -445,11 +606,60 @@ func (h *AuthHandler) HandleRefresh(w http.ResponseWriter, r *http.Request) {
 	h.logger.Infof("token refreshed for user %d (session: %s)", userID, sessionID)
 }
 
-// HandleLogout handles POST /auth/logout requests
+// HandleResendOTP handles POST /auth/resend-otp requests
 //
-//	Example: curl -X POST http://localhost:8080/auth/logout \
+//	Example: curl -X POST http://localhost:8080/auth/resend-otp \
 //	  -H "Content-Type: application/json" \
-//	  -d '{"session_id":"abc123...","reason":"user logout"}'
+//	  -d '{"email":"user@example.com","session_id":"abc123"}'
+func (h *AuthHandler) HandleResendOTP(w http.ResponseWriter, r *http.Request) {
+	h.logger.Debugf("handling ResendOTP request")
+
+	var req ResendOTPRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Errorf("failed to decode request body: %v", err)
+		h.respondError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Email == "" {
+		h.respondError(w, "Email is required", http.StatusBadRequest)
+		return
+	}
+
+	identity, err := h.identityService.GetIdentityByEmail(r.Context(), req.Email)
+	if err != nil {
+		h.logger.Warnf("resend OTP failed: user not found (%s)", req.Email)
+		h.respondError(w, "Invalid resend request", http.StatusUnauthorized)
+		return
+	}
+
+	if h.otpService == nil {
+		h.respondError(w, "OTP service unavailable", http.StatusInternalServerError)
+		return
+	}
+
+	otpOutput, err := h.otpService.GenerateOTP(r.Context(), &auth.GenerateOTPInput{
+		UserID:      identity.ID,
+		Type:        auth.OTPTypeEmail,
+		Destination: identity.Email,
+	})
+	if err != nil {
+		h.logger.Errorf("failed to generate resend OTP: %v", err)
+		h.respondError(w, "Failed to resend verification code", http.StatusInternalServerError)
+		return
+	}
+
+	h.logger.Infof("resend OTP generated for user %d; code sent to %s", identity.ID, identity.Email)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(ResendOTPResponse{
+		SessionID: req.SessionID,
+		ExpiresAt: otpOutput.ExpiresAt.Format("2006-01-02T15:04:05Z"),
+		Message:   "Verification code resent successfully.",
+	})
+}
+
 func (h *AuthHandler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	h.logger.Debugf("handling Logout request")
 
@@ -548,6 +758,8 @@ func (h *AuthHandler) respondError(w http.ResponseWriter, message string, status
 // RegisterAuthRoutes registers all authentication routes
 func RegisterAuthRoutes(mux Router, handler *AuthHandler) {
 	mux.HandleFunc("POST /auth/signup", handler.HandleSignup)
+	mux.HandleFunc("POST /auth/verify-otp", handler.HandleVerifyOTP)
+	mux.HandleFunc("POST /auth/resend-otp", handler.HandleResendOTP)
 	mux.HandleFunc("POST /auth/login", handler.HandleLogin)
 	mux.HandleFunc("POST /auth/refresh", handler.HandleRefresh)
 	mux.HandleFunc("POST /auth/logout", handler.HandleLogout)

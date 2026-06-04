@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/teamart/commerce-api/pkg/logger"
@@ -28,6 +29,7 @@ func NewIdentityService(config *AuthConfig, logger *logger.Logger, repo Identity
 type CreateIdentityInput struct {
 	Email    string
 	Password string // Plain text password (should be hashed before storing)
+	Role     string // Requested user role
 }
 
 // CreateIdentityOutput represents the output of creating an identity
@@ -65,8 +67,14 @@ func (is *IdentityService) CreateIdentity(ctx context.Context, input *CreateIden
 	passwordHash := is.hashPassword(input.Password)
 
 	// Create identity
+	role := strings.TrimSpace(input.Role)
+	if role == "" {
+		role = "customer"
+	}
+
 	identity := &UserIdentity{
 		Email:           input.Email,
+		Role:            role,
 		PasswordHash:    passwordHash,
 		OnboardingState: StateNew,
 		AccountStatus:   AccountStatusPending,

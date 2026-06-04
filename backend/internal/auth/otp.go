@@ -83,7 +83,6 @@ func (s *OTPService) GenerateOTP(ctx context.Context, input *GenerateOTPInput) (
 // VerifyOTPInput represents input for OTP verification
 type VerifyOTPInput struct {
 	UserID int64
-	OTPID  string
 	Code   string // Plain OTP code from user
 }
 

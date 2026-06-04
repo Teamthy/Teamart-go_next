@@ -50,7 +50,8 @@ func SetupHandlers(
 	redisService := auth.NewRedisService(nil, log)
 
 	// Create auth handlers
-	authHandler := NewAuthHandler(identityService, sessionService, tokenService, redisService, log)
+	otpService := auth.NewOTPService(authConfig, log)
+	authHandler := NewAuthHandler(identityService, sessionService, tokenService, redisService, otpService, log)
 	sessionHandler := NewSessionHandler(sessionService, log)
 
 	// Register auth routes

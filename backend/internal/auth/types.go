@@ -81,6 +81,7 @@ type UserIdentity struct {
 	// Core Fields
 	ID           int64  // Unique user ID
 	Email        string // User email (unique)
+	Role         string // User role label (customer, creator, merchant)
 	PasswordHash string // Bcrypt password hash
 
 	// Status & State

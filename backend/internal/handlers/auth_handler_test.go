@@ -45,7 +45,7 @@ func TestAuthHandlerLoginReturnsTokenPairAndUser(t *testing.T) {
 		t.Fatalf("create identity: %v", err)
 	}
 
-	handler := NewAuthHandler(identityService, sessionService, tokenService, auth.NewRedisService(nil, log), log)
+	handler := NewAuthHandler(identityService, sessionService, tokenService, auth.NewRedisService(nil, log), auth.NewOTPService(cfg, log), log)
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/login", strings.NewReader(`{"email":"login-user@example.com","password":"StrongPass1","user_agent":"test-agent","ip_address":"127.0.0.1"}`))
 	resp := httptest.NewRecorder()
@@ -85,7 +85,7 @@ func TestAuthHandlerStartsGoogleOAuthRedirect(t *testing.T) {
 	t.Setenv("GOOGLE_CLIENT_SECRET", "google-client-secret")
 	t.Setenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/auth/google/callback")
 
-	handler := NewAuthHandler(nil, nil, nil, nil, logger.NewNoop())
+	handler := NewAuthHandler(nil, nil, nil, nil, nil, logger.NewNoop())
 	service := authoauth.NewOAuthService(authoauth.NewMemoryStateStorage())
 	if err := service.RegisterProvider(&authoauth.OAuthConfig{
 		Provider:     authoauth.ProviderGoogle,
