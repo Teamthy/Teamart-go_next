@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Lock, Mail, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, Sparkles } from "lucide-react";
 
+import AuthShell from "@/components/auth/AuthShell";
+import Input from "@/components/ui/input";
 import * as api from "@/lib/api";
 
 type AuthVariant = "login" | "register" | "mfa" | "forgot";
@@ -26,7 +28,7 @@ function normalizeRole(role?: string): Role {
     }
 }
 
-function persistAuthResponse(response: any) {
+function persistAuthResponse(response: Record<string, unknown> | null) {
     if (!response || typeof window === "undefined") return;
 
     if (response.access_token) {
@@ -74,7 +76,6 @@ export default function AuthTemplate({
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [otp, setOtp] = useState("");
-    const [remember, setRemember] = useState(false);
     const [selectedRole, setSelectedRole] = useState<Role>(normalizeRole(initialRole));
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -93,19 +94,15 @@ export default function AuthTemplate({
         try {
             if (isMfa) {
                 const pending = sessionStorage.getItem("pendingSession");
-                const sess = pending ? JSON.parse(pending) : null;
+                const sess = pending ? (JSON.parse(pending) as Record<string, unknown>) : null;
                 const sessionId = sess?.session_id || sess?.sessionID;
 
                 if (!sessionId) throw new Error("Missing MFA session");
 
-                const res = await api.verifyOTP(sessionId, otp);
-
-                persistAuthResponse(res);
+                await api.verifyOTP(String(sessionId), otp);
 
                 sessionStorage.removeItem("pendingSession");
-
                 router.push("/");
-
                 return;
             }
 
@@ -131,42 +128,55 @@ export default function AuthTemplate({
             }
 
             if (isRegister) {
-                await api.signup(email, password);
+                const apiRole = selectedRole === "Shopper" ? "customer" : selectedRole.toLowerCase();
+                await api.signup(email, password, apiRole);
 
                 router.push("/auth/login");
             }
-        } catch (err: any) {
-            setError(err?.message || "Request failed");
+        } catch (error: unknown) {
+            setError(error instanceof Error ? error.message : "Request failed");
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(236,72,153,0.14),transparent_28%),linear-gradient(180deg,#050816_0%,#0b1124_100%)] px-4 py-12 text-white sm:px-6 lg:px-8">
-            <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[1.05fr_0.95fr]">
-                <div className="space-y-8 rounded-[3rem] border border-white/10 bg-white/5 p-8">
-                    <span className="inline-flex items-center gap-2 rounded-full border border-fuchsia-400/30 bg-fuchsia-500/10 px-4 py-2 text-sm text-fuchsia-200">
+        <AuthShell
+            title={isLogin ? "Sign in" : isRegister ? "Create account" : isMfa ? "Verify identity" : "Forgot password"}
+            description={
+                isLogin
+                    ? "Access your Teamart account and continue shopping."
+                    : isRegister
+                        ? "Create a secure account to buy, create, or sell with Teamart."
+                        : isMfa
+                            ? "Enter the verification code sent to your email."
+                            : "Enter your email to reset your password."
+            }
+            variant="default"
+            attentionText="One account can support shoppers, creators, and merchants across the platform."
+            showBackButton={!isLogin}
+            backHref="/auth"
+        >
+            <div className="space-y-8">
+                <div className="rounded-[2rem] border border-zinc-200 bg-zinc-50 p-6">
+                    <div className="inline-flex items-center gap-2 rounded-full bg-pink-50 px-4 py-2 text-sm font-semibold text-pink-700">
                         <Sparkles className="h-4 w-4" />
                         Teamart social commerce
-                    </span>
-
-                    <AuthIllustration />
+                    </div>
+                    <div className="mt-6 space-y-3 text-zinc-700">
+                        <p className="text-lg font-semibold text-zinc-900">Fast, secure account access</p>
+                        <p className="text-sm leading-6">
+                            Use one growth-ready auth flow for buyers, creators, and sellers. Everything stays in sync across the app.
+                        </p>
+                    </div>
+                    <div className="mt-6 hidden lg:block">
+                        <AuthIllustration />
+                    </div>
                 </div>
 
-                <div className="rounded-[2.5rem] border border-white/10 bg-slate-950/95 p-8">
-                    <h2 className="mb-6 text-3xl font-semibold">
-                        {isLogin
-                            ? "Sign in"
-                            : isRegister
-                                ? "Create account"
-                                : isMfa
-                                    ? "Verify identity"
-                                    : "Forgot password"}
-                    </h2>
-
+                <div className="rounded-[2rem] border border-zinc-200 bg-white p-6 shadow-sm">
                     {error && (
-                        <div className="mb-6 rounded-3xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-200">
+                        <div className="mb-6 rounded-3xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                             {error}
                         </div>
                     )}
@@ -174,19 +184,19 @@ export default function AuthTemplate({
                     <form onSubmit={handleSubmit} className="space-y-6">
                         {!isMfa && !isForgot && (
                             <>
-                                <input
+                                <Input
                                     type="email"
-                                    placeholder="Email"
-                                    className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3"
+                                    label="Email Address"
+                                    placeholder="you@example.com"
                                     required
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                 />
 
-                                <input
+                                <Input
                                     type="password"
-                                    placeholder="Password"
-                                    className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3"
+                                    label="Password"
+                                    placeholder="••••••••••••"
                                     required
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
@@ -201,9 +211,9 @@ export default function AuthTemplate({
                                         key={role}
                                         type="button"
                                         onClick={() => setSelectedRole(role)}
-                                        className={`rounded-3xl border px-4 py-3 ${selectedRole === role
-                                            ? "border-fuchsia-400 bg-fuchsia-500/10"
-                                            : "border-white/10"
+                                        className={`rounded-3xl border px-4 py-3 text-sm font-semibold ${selectedRole === role
+                                            ? "border-pink-400 bg-pink-50 text-zinc-900"
+                                            : "border-zinc-200 bg-white text-zinc-700"
                                             }`}
                                     >
                                         {role}
@@ -213,10 +223,10 @@ export default function AuthTemplate({
                         )}
 
                         {isMfa && (
-                            <input
+                            <Input
                                 type="text"
-                                placeholder="Verification code"
-                                className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3"
+                                label="Verification Code"
+                                placeholder="Enter 6-digit code"
                                 required
                                 value={otp}
                                 onChange={(e) => setOtp(e.target.value)}
@@ -224,17 +234,18 @@ export default function AuthTemplate({
                         )}
 
                         {isForgot && (
-                            <input
+                            <Input
                                 type="email"
-                                placeholder="Email address"
-                                className="w-full rounded-3xl border border-slate-800 bg-slate-900 px-4 py-3"
+                                label="Email Address"
+                                placeholder="you@example.com"
+                                required
                             />
                         )}
 
                         <button
                             disabled={loading}
                             type="submit"
-                            className="inline-flex w-full items-center justify-center gap-3 rounded-full bg-fuchsia-500 px-6 py-3"
+                            className="inline-flex w-full items-center justify-center gap-3 rounded-full bg-pink-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-pink-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {loading ? "Working…" : "Continue"}
                             <ArrowRight className="h-4 w-4" />
@@ -242,18 +253,18 @@ export default function AuthTemplate({
                     </form>
 
                     {!isMfa && (
-                        <p className="mt-6 text-center text-sm text-slate-400">
+                        <p className="mt-6 text-center text-sm text-zinc-500">
                             {isLogin ? (
                                 <>
                                     New to Teamart?{" "}
-                                    <Link href="/auth/register" className="text-fuchsia-300">
+                                    <Link href="/auth/register" className="font-semibold text-pink-600 hover:text-pink-700">
                                         Create account
                                     </Link>
                                 </>
                             ) : (
                                 <>
                                     Already have an account?{" "}
-                                    <Link href="/auth/login" className="text-fuchsia-300">
+                                    <Link href="/auth/login" className="font-semibold text-pink-600 hover:text-pink-700">
                                         Sign in
                                     </Link>
                                 </>
@@ -262,6 +273,6 @@ export default function AuthTemplate({
                     )}
                 </div>
             </div>
-        </div>
+        </AuthShell>
     );
 }

@@ -40,7 +40,7 @@ export default function PremiumAuthLayout({
 
     return (
         <div
-            className="min-h-screen bg-gradient-to-br from-zinc-50 to-zinc-100 px-4 py-8 sm:px-6 lg:px-8"
+            className="min-h-screen bg-gradient-to-br from-[var(--surface-muted)] to-[var(--background)] px-4 py-8 sm:px-6 lg:px-8"
             role="main"
         >
             {/* Background gradient accent */}
@@ -54,7 +54,7 @@ export default function PremiumAuthLayout({
                 {showBackButton && (
                     <button
                         onClick={handleBack}
-                        className="mb-6 inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-white/50 hover:text-zinc-900"
+                        className="mb-6 inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[var(--text-muted)] transition hover:bg-[var(--surface)] hover:text-[var(--foreground)]"
                         aria-label="Go back"
                     >
                         <ArrowLeft className="h-4 w-4" />
@@ -97,12 +97,12 @@ export default function PremiumAuthLayout({
                         )}
 
                         {/* Right column - Auth form */}
-                        <div className="rounded-2xl border border-white/20 bg-white/80 p-8 shadow-lg backdrop-blur-xl sm:p-10">
+                        <div className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface)]/95 p-8 shadow-lg backdrop-blur-xl sm:p-10">
                             {title && (
                                 <div className="mb-8 text-center">
-                                    <h2 className="text-2xl font-bold text-zinc-900">{title}</h2>
+                                    <h2 className="text-2xl font-bold text-[var(--foreground)]">{title}</h2>
                                     {description && (
-                                        <p className="mt-2 text-sm text-zinc-600">{description}</p>
+                                        <p className="mt-2 text-sm text-[var(--text-muted)]">{description}</p>
                                     )}
                                 </div>
                             )}
@@ -117,7 +117,7 @@ export default function PremiumAuthLayout({
                                 <p className="mt-2 text-sm text-zinc-600">{description}</p>
                             )}
                         </div>
-                        <div className="rounded-2xl border border-white/20 bg-white/80 p-6 shadow-lg backdrop-blur-xl">
+                        <div className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface)]/95 p-6 shadow-lg backdrop-blur-xl">
                             {children}
                         </div>
                     </div>
@@ -131,7 +131,7 @@ export default function PremiumAuthLayout({
                             )}
                         </div>
 
-                        <div className="rounded-2xl border border-white/20 bg-white/80 p-8 shadow-lg backdrop-blur-xl sm:p-10">
+                        <div className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface)]/95 p-8 shadow-lg backdrop-blur-xl sm:p-10">
                             {children}
                         </div>
                     </div>
@@ -139,7 +139,7 @@ export default function PremiumAuthLayout({
             </div>
 
             {/* Footer */}
-            <div className="mx-auto mt-8 max-w-7xl text-center text-xs text-zinc-500">
+            <div className="mx-auto mt-8 max-w-7xl text-center text-xs text-[var(--text-muted)]">
                 <p>
                     © 2026 Teamart.{" "}
                     <Link href="/privacy" className="underline hover:text-zinc-700">

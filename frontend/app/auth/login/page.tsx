@@ -11,8 +11,9 @@ import { Controller } from "react-hook-form";
 import { useFormValidation } from "@/hooks/useFormValidation";
 import { loginSchema } from "@/schemas/auth.schema";
 import { useAuthStore } from "@/store/useAuthStore";
-import PremiumAuthLayout from "@/components/auth/PremiumAuthLayout";
-import { Eye, EyeOff, AlertCircle, ArrowRight } from "lucide-react";
+import AuthShell from "@/components/auth/AuthShell";
+import Input from "@/components/ui/input";
+import { Eye, EyeOff, ArrowRight } from "lucide-react";
 import { getErrorMessage } from "@/lib/form";
 
 export default function LoginPage() {
@@ -27,14 +28,14 @@ export default function LoginPage() {
             try {
                 await login(data.email, data.password);
                 router.push("/feed");
-            } catch (error) {
+            } catch {
                 // Error handling is done by the store
             }
         },
     });
 
     return (
-        <PremiumAuthLayout
+        <AuthShell
             title="Welcome Back"
             description="Sign in to continue shopping and explore new products."
             variant="compact"
@@ -42,49 +43,26 @@ export default function LoginPage() {
             backHref="/auth"
         >
             <form onSubmit={handleSubmit(onSubmitHandler)} className="space-y-5">
-                {/* Email field */}
-                <div>
-                    <label htmlFor="email" className="block text-sm font-semibold text-zinc-900 mb-2">
-                        Email Address
-                        <span className="text-red-500">*</span>
-                    </label>
-                    <Controller
-                        name="email"
-                        control={control}
-                        render={({ field }) => (
-                            <input
-                                {...field}
-                                type="email"
-                                id="email"
-                                placeholder="you@example.com"
-                                className={`w-full rounded-lg border-2 px-4 py-3 transition-all focus:outline-none ${errors.email
-                                    ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-2 focus:ring-red-100"
-                                    : "border-zinc-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
-                                    }`}
-                                aria-invalid={errors.email ? "true" : "false"}
-                            />
-                        )}
-                    />
-                    {errors.email && (
-                        (() => {
-                            const msg = getErrorMessage(errors.email, "Invalid email");
-                            return msg ? (
-                                <div className="mt-2 flex items-start gap-2 text-sm text-red-600">
-                                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                                    <span>{msg}</span>
-                                </div>
-                            ) : null;
-                        })()
+                <Controller
+                    name="email"
+                    control={control}
+                    render={({ field }) => (
+                        <Input
+                            {...field}
+                            type="email"
+                            id="email"
+                            label="Email Address"
+                            placeholder="you@example.com"
+                            error={errors.email ? getErrorMessage(errors.email, "Invalid email") : undefined}
+                            aria-invalid={errors.email ? "true" : "false"}
+                        />
                     )}
-                </div>
+                />
 
                 {/* Password field */}
                 <div>
                     <div className="flex items-center justify-between mb-2">
-                        <label htmlFor="password" className="text-sm font-semibold text-zinc-900">
-                            Password
-                            <span className="text-red-500">*</span>
-                        </label>
+                        <span className="text-sm font-semibold text-zinc-900">Password</span>
                         <button
                             type="button"
                             onClick={() => router.push("/auth/forgot-password")}
@@ -98,22 +76,20 @@ export default function LoginPage() {
                             name="password"
                             control={control}
                             render={({ field }) => (
-                                <input
+                                <Input
                                     {...field}
                                     type={showPassword ? "text" : "password"}
                                     id="password"
                                     placeholder="••••••••••••"
-                                    className={`w-full rounded-lg border-2 px-4 py-3 pr-10 transition-all focus:outline-none font-mono text-sm ${errors.password
-                                        ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-2 focus:ring-red-100"
-                                        : "border-zinc-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
-                                        }`}
-                                    aria-invalid={errors.password ? "true" : "false"}
+                                    error={errors.password ? getErrorMessage(errors.password, "Invalid password") : undefined}
+                                    className="pr-10 font-mono text-sm"
                                 />
                             )}
                         />
                         <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
+                            aria-label={showPassword ? "Hide password" : "Show password"}
                             className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-700"
                         >
                             {showPassword ? (
@@ -123,17 +99,6 @@ export default function LoginPage() {
                             )}
                         </button>
                     </div>
-                    {errors.password && (
-                        (() => {
-                            const msg = getErrorMessage(errors.password, "Invalid password");
-                            return msg ? (
-                                <div className="mt-2 flex items-start gap-2 text-sm text-red-600">
-                                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                                    <span>{msg}</span>
-                                </div>
-                            ) : null;
-                        })()
-                    )}
                 </div>
 
                 {/* Remember me - optional feature */}
@@ -167,7 +132,7 @@ export default function LoginPage() {
 
                 {/* Sign up link */}
                 <p className="text-center text-sm text-zinc-600">
-                    Don't have an account?{" "}
+                    Don&apos;t have an account?{" "}
                     <button
                         type="button"
                         onClick={() => router.push("/auth")}
@@ -187,6 +152,6 @@ export default function LoginPage() {
                     <li>• 2FA available in account settings</li>
                 </ul>
             </div>
-        </PremiumAuthLayout>
+        </AuthShell>
     );
 }

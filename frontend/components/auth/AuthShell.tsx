@@ -1,17 +1,46 @@
+"use client";
+
 import type { ReactNode } from "react";
+import PremiumAuthLayout from "@/components/auth/PremiumAuthLayout";
+
+interface AuthShellProps {
+    title?: string;
+    description?: string;
+    variant?: "default" | "compact" | "wide";
+    showBackButton?: boolean;
+    backHref?: string;
+    attentionText?: string;
+    footer?: ReactNode;
+    children: ReactNode;
+}
 
 export default function AuthShell({
+    title,
+    description,
+    variant = "compact",
+    showBackButton = false,
+    backHref = "/auth",
+    attentionText,
+    footer,
     children,
-    className = "",
-}: {
-    children: ReactNode;
-    className?: string;
-}) {
+}: AuthShellProps) {
     return (
-        <div className={"min-h-screen bg-[#FCE4EC] px-4 py-6 sm:px-6 sm:py-10 " + className}>
-            <div className="mx-auto w-full max-w-[420px] overflow-hidden rounded-[3rem] bg-white shadow-[0_30px_80px_rgba(233,30,99,0.12)]">
+        <PremiumAuthLayout
+            title={title}
+            description={description}
+            variant={variant}
+            showBackButton={showBackButton}
+            backHref={backHref}
+        >
+            <div className="space-y-6">
+                {attentionText ? (
+                    <div className="rounded-3xl border border-[var(--surface-border)] bg-[var(--surface-muted)] px-4 py-3 text-sm text-[var(--text-muted)]">
+                        {attentionText}
+                    </div>
+                ) : null}
                 {children}
+                {footer}
             </div>
-        </div>
+        </PremiumAuthLayout>
     );
 }

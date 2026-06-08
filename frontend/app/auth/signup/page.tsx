@@ -5,65 +5,68 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Controller } from "react-hook-form";
 import { useFormValidation } from "@/hooks/useFormValidation";
 import { signupSchema } from "@/schemas/auth.schema";
 import { useAuthStore } from "@/store/useAuthStore";
-import PremiumAuthLayout from "@/components/auth/PremiumAuthLayout";
-import { Eye, EyeOff, AlertCircle, CheckCircle2, Mail } from "lucide-react";
+import AuthShell from "@/components/auth/AuthShell";
+import Button from "@/components/ui/button";
+import Input from "@/components/ui/input";
+import Link from "next/link";
+import { Eye, EyeOff } from "lucide-react";
 import { getErrorMessage } from "@/lib/form";
 
 export default function SignupPage() {
     const router = useRouter();
     const { signup } = useAuthStore();
 
-    const [role, setRole] = useState<"customer" | "creator" | "merchant">("customer");
+    const roleOptions = [
+        { value: "customer", label: "Buyer", description: "Browse, save, and shop your favorite creators." },
+        { value: "creator", label: "Creator", description: "Share work, grow an audience, and sell original products." },
+        { value: "merchant", label: "Seller", description: "Open a store and connect directly with shoppers." },
+    ] as const;
 
-    // Read role from URL on client-side to avoid SSR/prerender issues
-    useEffect(() => {
+    const [selectedRole, setSelectedRole] = useState<"customer" | "creator" | "merchant">(() => {
+        if (typeof window === "undefined") {
+            return "customer";
+        }
+
         try {
             const params = new URLSearchParams(window.location.search);
-            const r = (params.get("role") || "customer") as "customer" | "creator" | "merchant";
-            setRole(r);
-        } catch (e) {
-            setRole("customer");
+            return (params.get("role") || "customer") as "customer" | "creator" | "merchant";
+        } catch {
+            return "customer";
         }
-    }, []);
+    });
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-    const [passwordStrength, setPasswordStrength] = useState<"weak" | "medium" | "strong">("weak");
 
     const { control, formState: { errors }, handleSubmit, watch, onSubmitHandler, isSubmitting } = useFormValidation({
         schema: signupSchema,
         onSubmit: async (data) => {
-            await signup(data.email, data.password, role);
-            // Navigate to email verification
+            await signup(data.email, data.password, selectedRole);
             router.push(`/auth/verify-email?email=${encodeURIComponent(data.email)}`);
         },
     });
 
     const password = watch("password");
 
-    // Calculate password strength
-    useEffect(() => {
-        if (!password) {
-            setPasswordStrength("weak");
-            return;
-        }
-
+    const getPasswordStrength = (passwordValue: string) => {
         let strength = 0;
-        if (password.length >= 12) strength++;
-        if (/[a-z]/.test(password)) strength++;
-        if (/[A-Z]/.test(password)) strength++;
-        if (/[0-9]/.test(password)) strength++;
-        if (/[^A-Za-z0-9]/.test(password)) strength++;
+        if (passwordValue.length >= 12) strength++;
+        if (/[a-z]/.test(passwordValue)) strength++;
+        if (/[A-Z]/.test(passwordValue)) strength++;
+        if (/[0-9]/.test(passwordValue)) strength++;
+        if (/[^A-Za-z0-9]/.test(passwordValue)) strength++;
 
-        if (strength <= 2) setPasswordStrength("weak");
-        else if (strength <= 3) setPasswordStrength("medium");
-        else setPasswordStrength("strong");
-    }, [password]);
+        if (strength <= 2) return "weak";
+        if (strength <= 3) return "medium";
+        return "strong";
+    };
+
+    const passwordStrength = getPasswordStrength(password || "");
 
     const getPasswordStrengthColor = () => {
         switch (passwordStrength) {
@@ -77,7 +80,7 @@ export default function SignupPage() {
     };
 
     const getRoleLabel = () => {
-        switch (role) {
+        switch (selectedRole) {
             case "customer":
                 return "Buyer";
             case "creator":
@@ -88,7 +91,7 @@ export default function SignupPage() {
     };
 
     return (
-        <PremiumAuthLayout
+        <AuthShell
             title="Create Your Account"
             description={`Join as a ${getRoleLabel()}. You'll receive an email to verify your account.`}
             variant="compact"
@@ -96,53 +99,48 @@ export default function SignupPage() {
             backHref="/auth"
         >
             <form onSubmit={handleSubmit(onSubmitHandler)} className="space-y-5">
-                {/* Role badge */}
-                <div className="inline-block rounded-full bg-pink-100 px-3 py-1 text-xs font-semibold text-pink-700">
-                    {getRoleLabel()} Account
-                </div>
+                <div className="rounded-3xl border border-[var(--surface-border)] bg-[var(--surface)] p-4">
+                    <p className="text-sm font-semibold text-[var(--foreground)]">Choose your account type</p>
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">
+                        Pick the role that best matches how you plan to use Teamart today.
+                    </p>
 
-                {/* Email field */}
-                <div>
-                    <label htmlFor="email" className="block text-sm font-semibold text-zinc-900 mb-2">
-                        Email Address
-                        <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                        <Controller
-                            name="email"
-                            control={control}
-                            render={({ field }) => (
-                                <input
-                                    {...field}
-                                    type="email"
-                                    id="email"
-                                    placeholder="you@example.com"
-                                    className={`w-full rounded-lg border-2 px-4 py-3 pr-10 transition-all focus:outline-none ${errors.email
-                                        ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-2 focus:ring-red-100"
-                                        : "border-zinc-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
-                                        }`}
-                                    aria-invalid={errors.email ? "true" : "false"}
-                                />
-                            )}
-                        />
-                        {!errors.email && password && (
-                            <Mail className="absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-500" />
-                        )}
+                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                        {roleOptions.map((option) => {
+                            const active = selectedRole === option.value;
+                            return (
+                                <button
+                                    key={option.value}
+                                    type="button"
+                                    onClick={() => setSelectedRole(option.value)}
+                                    aria-pressed={active}
+                                    className={`rounded-3xl border p-4 text-left transition ${active ? "border-[var(--primary)] bg-[var(--primary-muted)] text-[var(--foreground)]" : "border-[var(--surface-border)] bg-[var(--surface)] text-[var(--foreground)] hover:border-[var(--primary)] hover:bg-[var(--surface-muted)]"}`}
+                                >
+                                    <p className="text-sm font-semibold">{option.label}</p>
+                                    <p className="mt-1 text-xs text-[var(--text-muted)]">{option.description}</p>
+                                </button>
+                            );
+                        })}
                     </div>
-                    {errors.email && (
-                        (() => {
-                            const msg = getErrorMessage(errors.email, "Invalid email");
-                            return msg ? (
-                                <div className="mt-2 flex items-start gap-2 text-sm text-red-600">
-                                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                                    <span>{msg}</span>
-                                </div>
-                            ) : null;
-                        })()
-                    )}
                 </div>
 
-                {/* Password field */}
+                <Controller
+                    name="email"
+                    control={control}
+                    render={({ field }) => (
+                        <Input
+                            {...field}
+                            type="email"
+                            id="email"
+                            label="Email Address"
+                            placeholder="you@example.com"
+                            error={errors.email ? getErrorMessage(errors.email, "Invalid email") : undefined}
+                            aria-invalid={errors.email ? "true" : "false"}
+                            className="pr-10"
+                        />
+                    )}
+                />
+
                 <div>
                     <label htmlFor="password" className="block text-sm font-semibold text-zinc-900 mb-2">
                         Password
@@ -154,22 +152,22 @@ export default function SignupPage() {
                                 name="password"
                                 control={control}
                                 render={({ field }) => (
-                                    <input
+                                    <Input
                                         {...field}
                                         type={showPassword ? "text" : "password"}
                                         id="password"
                                         placeholder="••••••••••••"
-                                        className={`w-full rounded-lg border-2 px-4 py-3 pr-10 transition-all focus:outline-none font-mono text-sm ${errors.password
-                                            ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-2 focus:ring-red-100"
-                                            : "border-zinc-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
-                                            }`}
-                                        aria-invalid={errors.password ? "true" : "false"}
+                                        helperText={password ? `${passwordStrength.charAt(0).toUpperCase() + passwordStrength.slice(1)} password` : "At least 12 characters, one uppercase letter, one number, and one special character."}
+                                        helperTextId="password-strength"
+                                        error={errors.password ? getErrorMessage(errors.password, "Invalid password") : undefined}
+                                        className="pr-10 font-mono text-sm"
                                     />
                                 )}
                             />
                             <button
                                 type="button"
                                 onClick={() => setShowPassword(!showPassword)}
+                                aria-label={showPassword ? "Hide password" : "Show password"}
                                 className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-700"
                             >
                                 {showPassword ? (
@@ -180,7 +178,6 @@ export default function SignupPage() {
                             </button>
                         </div>
 
-                        {/* Password strength meter */}
                         {password && (
                             <div className="space-y-1.5">
                                 <div className="flex gap-1">
@@ -230,7 +227,6 @@ export default function SignupPage() {
                     )}
                 </div>
 
-                {/* Confirm password field */}
                 <div>
                     <label htmlFor="confirmPassword" className="block text-sm font-semibold text-zinc-900 mb-2">
                         Confirm Password
@@ -241,22 +237,20 @@ export default function SignupPage() {
                             name="confirmPassword"
                             control={control}
                             render={({ field }) => (
-                                <input
+                                <Input
                                     {...field}
                                     type={showConfirmPassword ? "text" : "password"}
                                     id="confirmPassword"
                                     placeholder="••••••••••••"
-                                    className={`w-full rounded-lg border-2 px-4 py-3 pr-10 transition-all focus:outline-none font-mono text-sm ${errors.confirmPassword
-                                        ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-2 focus:ring-red-100"
-                                        : "border-zinc-300 focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
-                                        }`}
-                                    aria-invalid={errors.confirmPassword ? "true" : "false"}
+                                    error={errors.confirmPassword ? getErrorMessage(errors.confirmPassword, "Passwords do not match") : undefined}
+                                    className="pr-10 font-mono text-sm"
                                 />
                             )}
                         />
                         <button
                             type="button"
                             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            aria-label={showConfirmPassword ? "Hide confirmation password" : "Show confirmation password"}
                             className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-700"
                         >
                             {showConfirmPassword ? (
@@ -266,24 +260,14 @@ export default function SignupPage() {
                             )}
                         </button>
                     </div>
-                    {errors.confirmPassword && (
-                        (() => {
-                            const msg = getErrorMessage(errors.confirmPassword, "Passwords do not match");
-                            return msg ? (
-                                <div className="mt-2 flex items-start gap-2 text-sm text-red-600">
-                                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                                    <span>{msg}</span>
-                                </div>
-                            ) : null;
-                        })()
-                    )}
                 </div>
 
                 {/* Submit button */}
-                <button
+                <Button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full rounded-lg bg-gradient-to-r from-pink-600 to-pink-500 px-4 py-3 font-semibold text-white transition-all hover:shadow-lg hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100"
+                    variant="primary"
+                    className="w-full"
                 >
                     {isSubmitting ? (
                         <span className="flex items-center justify-center gap-2">
@@ -293,20 +277,20 @@ export default function SignupPage() {
                     ) : (
                         "Continue to Email Verification"
                     )}
-                </button>
+                </Button>
 
                 {/* Terms */}
                 <p className="text-xs text-center text-zinc-600">
                     By signing up, you agree to our{" "}
-                    <a href="/terms" className="font-semibold text-pink-600 hover:underline">
+                    <Link href="/terms" className="font-semibold text-pink-600 hover:underline">
                         Terms of Service
-                    </a>{" "}
+                    </Link>{" "}
                     and{" "}
-                    <a href="/privacy" className="font-semibold text-pink-600 hover:underline">
+                    <Link href="/privacy" className="font-semibold text-pink-600 hover:underline">
                         Privacy Policy
-                    </a>
+                    </Link>
                 </p>
             </form>
-        </PremiumAuthLayout>
+        </AuthShell>
     );
 }

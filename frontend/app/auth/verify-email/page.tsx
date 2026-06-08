@@ -5,29 +5,32 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/useAuthStore";
 import * as api from "@/lib/api";
-import PremiumAuthLayout from "@/components/auth/PremiumAuthLayout";
+import AuthShell from "@/components/auth/AuthShell";
+import Button from "@/components/ui/button";
 import OTPInput from "@/components/auth/OTPInput";
 import { Mail, AlertCircle } from "lucide-react";
 
 export default function VerifyEmailPage() {
     const router = useRouter();
-    const [email, setEmail] = useState<string>("");
-    const { verifyOTP } = useAuthStore();
+    const [email] = useState<string>(() => {
+        if (typeof window === "undefined") {
+            return "";
+        }
 
-    useEffect(() => {
         try {
             const params = new URLSearchParams(window.location.search);
             const queryEmail = params.get("email") || "";
             const stored = getPendingSessionData();
-            setEmail(queryEmail || stored.email || "");
-        } catch (e) {
-            setEmail("");
+            return queryEmail || stored.email || "";
+        } catch {
+            return "";
         }
-    }, []);
+    });
+    const { verifyOTP } = useAuthStore();
 
     function getPendingSessionData() {
         if (typeof window === "undefined") {
@@ -51,6 +54,7 @@ export default function VerifyEmailPage() {
     }
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [statusMessage, setStatusMessage] = useState("Check your inbox and spam folder.");
     const [resendCountdown, setResendCountdown] = useState(0);
     const [resendAttempts, setResendAttempts] = useState(0);
 
@@ -101,6 +105,7 @@ export default function VerifyEmailPage() {
             await api.resendOTP(sessionId, targetEmail);
             setResendCountdown(60);
             setResendAttempts(resendAttempts + 1);
+            setStatusMessage(`Verification code resent to ${targetEmail}.`);
         } catch (err) {
             setError(
                 err instanceof Error ? err.message : "Failed to resend code. Please try again."
@@ -111,22 +116,21 @@ export default function VerifyEmailPage() {
     };
 
     return (
-        <PremiumAuthLayout
+        <AuthShell
             title="Verify Your Email"
             description={`We sent a 6-digit code to ${email || "your email"}. Enter it below.`}
             variant="compact"
             showBackButton
             backHref="/auth/signup"
+            attentionText="Code delivery can take a few moments. Check your inbox and spam folder."
         >
             <div className="space-y-6">
                 {/* Email display */}
-                <div className="flex items-center justify-center gap-2 rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-900 border border-blue-200">
+                <div className="flex items-center justify-center gap-2 rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-900 border border-blue-200" aria-live="polite">
                     <Mail className="h-4 w-4 flex-shrink-0" />
                     <div>
                         <p className="font-semibold">{email}</p>
-                        <p className="text-xs text-blue-800">
-                            {resendAttempts === 0 ? "Check your inbox and spam folder" : "Code resent successfully"}
-                        </p>
+                        <p className="text-xs text-blue-800">{statusMessage}</p>
                     </div>
                 </div>
 
@@ -156,7 +160,7 @@ export default function VerifyEmailPage() {
 
                 {/* Resend section */}
                 <div className="space-y-3 border-t border-zinc-200 pt-4">
-                    <p className="text-sm text-zinc-600">Didn't receive the code?</p>
+                    <p className="text-sm text-zinc-600">Didn&apos;t receive the code?</p>
 
                     {resendCountdown > 0 ? (
                         <div className="text-center">
@@ -172,13 +176,15 @@ export default function VerifyEmailPage() {
                             </p>
                         </div>
                     ) : (
-                        <button
+                        <Button
+                            type="button"
                             onClick={handleResendOTP}
                             disabled={isLoading || resendCountdown > 0}
-                            className="w-full rounded-lg border-2 border-pink-300 px-4 py-2.5 font-semibold text-pink-600 transition-all hover:bg-pink-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            variant="secondary"
+                            className="w-full"
                         >
                             Send Code Again
-                        </button>
+                        </Button>
                     )}
 
                     {resendAttempts > 0 && resendAttempts < 3 && (
@@ -198,6 +204,6 @@ export default function VerifyEmailPage() {
                     </ul>
                 </div>
             </div>
-        </PremiumAuthLayout>
+        </AuthShell>
     );
 }

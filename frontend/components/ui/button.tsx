@@ -7,9 +7,9 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantStyles = {
-    primary: "bg-[#E91E63] text-white hover:bg-[#d81b60]",
-    secondary: "border border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-50",
-    ghost: "border border-[#E91E63] bg-transparent text-[#E91E63] hover:bg-[#FCE4EC]",
+    primary: "bg-[var(--primary)] text-[var(--surface)] hover:bg-[var(--primary-darker)]",
+    secondary: "border border-[var(--surface-border)] bg-[var(--surface)] text-[var(--foreground)] hover:bg-[var(--surface-muted)]",
+    ghost: "border border-[var(--primary)] bg-transparent text-[var(--primary)] hover:bg-[var(--primary-muted)]",
 };
 
 export default function Button({
@@ -19,7 +19,7 @@ export default function Button({
     asChild = false,
     ...props
 }: ButtonProps) {
-    const baseClassName = `inline-flex items-center justify-center rounded-[24px] px-4 py-3 text-sm font-semibold transition-all duration-200 active:scale-[0.99] ${variantStyles[variant]} ${className}`;
+    const baseClassName = `inline-flex items-center justify-center rounded-[var(--button-radius)] px-4 py-3 text-sm font-semibold transition-all duration-200 active:scale-[0.99] ${variantStyles[variant]} ${className}`;
 
     if (asChild && isValidElement(children)) {
         const child = children as ReactElement<{ className?: string }>;
