@@ -43,6 +43,42 @@ func TestCreateIdentity_Success(t *testing.T) {
 	}
 }
 
+func TestCreateIdentity_WithRole(t *testing.T) {
+	config := &AuthConfig{
+		PasswordMinLength:      8,
+		PasswordRequireSpecial: false,
+		PasswordRequireNumbers: false,
+	}
+	mockLogger := logger.NewLogger("test", false)
+	repo := NewIdentityRepositoryMemory(mockLogger)
+	service := NewIdentityService(config, mockLogger, repo)
+
+	input := &CreateIdentityInput{
+		Email:    "user@example.com",
+		Password: "password123",
+		Role:     "creator",
+	}
+
+	output, err := service.CreateIdentity(context.Background(), input)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if output.Identity == nil {
+		t.Fatal("expected identity, got nil")
+	}
+	if output.Identity.Role != "creator" {
+		t.Errorf("expected role creator, got %s", output.Identity.Role)
+	}
+
+	identity, err := repo.GetIdentityByEmail(context.Background(), "user@example.com")
+	if err != nil {
+		t.Fatalf("expected identity to be retrievable, got %v", err)
+	}
+	if identity.Role != "creator" {
+		t.Errorf("expected stored role creator, got %s", identity.Role)
+	}
+}
+
 // TestCreateIdentity_DuplicateEmail tests creation with duplicate email
 func TestCreateIdentity_DuplicateEmail(t *testing.T) {
 	config := &AuthConfig{

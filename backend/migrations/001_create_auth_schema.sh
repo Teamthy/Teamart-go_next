@@ -11,6 +11,7 @@ psql "$DATABASE_URL" <<'EOF'
 CREATE TABLE IF NOT EXISTS users (
     id BIGSERIAL PRIMARY KEY,
     email VARCHAR(255) NOT NULL UNIQUE,
+    role VARCHAR(50) NOT NULL DEFAULT 'customer',
     password_hash VARCHAR(255) NOT NULL,
     
     -- Onboarding state machine

@@ -84,6 +84,7 @@ func (s *OTPService) GenerateOTP(ctx context.Context, input *GenerateOTPInput) (
 type VerifyOTPInput struct {
 	UserID int64
 	Code   string // Plain OTP code from user
+	OTPID  string // Optional OTP ID when persistence is available
 }
 
 // VerifyOTPOutput represents the result of OTP verification
@@ -98,9 +99,6 @@ type VerifyOTPOutput struct {
 func (s *OTPService) VerifyOTP(ctx context.Context, input *VerifyOTPInput) (*VerifyOTPOutput, error) {
 	if input.UserID == 0 {
 		return nil, fmt.Errorf("user ID is required")
-	}
-	if input.OTPID == "" {
-		return nil, fmt.Errorf("OTP ID is required")
 	}
 	if input.Code == "" {
 		return nil, fmt.Errorf("OTP code is required")

@@ -35,13 +35,13 @@ func (r *IdentityRepositoryPostgres) CreateIdentity(ctx context.Context, identit
 
 	query := `
 		INSERT INTO users (
-			email, password_hash, onboarding_state, account_status, is_active,
+			email, role, password_hash, onboarding_state, account_status, is_active,
 			failed_login_attempts, locked_until, password_changed_at,
 			requires_mfa, mfa_method, created_at, updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5,
-			$6, $7, $8,
-			$9, $10, $11, $12
+			$1, $2, $3, $4, $5, $6,
+			$7, $8, $9,
+			$10, $11, $12, $13
 		)
 		RETURNING id, created_at, updated_at
 	`
@@ -49,6 +49,7 @@ func (r *IdentityRepositoryPostgres) CreateIdentity(ctx context.Context, identit
 	now := time.Now()
 	err := r.db.QueryRow(ctx, query,
 		identity.Email,
+		identity.Role,
 		identity.PasswordHash,
 		identity.OnboardingState,
 		identity.AccountStatus,
@@ -82,7 +83,7 @@ func (r *IdentityRepositoryPostgres) GetIdentityByID(ctx context.Context, userID
 
 	query := `
 		SELECT
-			id, email, password_hash, onboarding_state, account_status, is_active,
+			id, email, role, password_hash, onboarding_state, account_status, is_active,
 			failed_login_attempts, failed_login_last_attempt, locked_until,
 			password_changed_at, last_login_at, last_login_ip,
 			recovery_email, phone_number, requires_mfa, mfa_method,
@@ -95,6 +96,7 @@ func (r *IdentityRepositoryPostgres) GetIdentityByID(ctx context.Context, userID
 	err := r.db.QueryRow(ctx, query, userID).Scan(
 		&identity.ID,
 		&identity.Email,
+		&identity.Role,
 		&identity.PasswordHash,
 		&identity.OnboardingState,
 		&identity.AccountStatus,
@@ -133,7 +135,7 @@ func (r *IdentityRepositoryPostgres) GetIdentityByEmail(ctx context.Context, ema
 
 	query := `
 		SELECT
-			id, email, password_hash, onboarding_state, account_status, is_active,
+			id, email, role, password_hash, onboarding_state, account_status, is_active,
 			failed_login_attempts, failed_login_last_attempt, locked_until,
 			password_changed_at, last_login_at, last_login_ip,
 			recovery_email, phone_number, requires_mfa, mfa_method,
@@ -146,6 +148,7 @@ func (r *IdentityRepositoryPostgres) GetIdentityByEmail(ctx context.Context, ema
 	err := r.db.QueryRow(ctx, query, email).Scan(
 		&identity.ID,
 		&identity.Email,
+		&identity.Role,
 		&identity.PasswordHash,
 		&identity.OnboardingState,
 		&identity.AccountStatus,
