@@ -447,9 +447,14 @@ export async function deleteProduct(productId: number) {
 
 export interface OrderResponse {
     id: number | string;
+    order_number?: string;
     user_id?: number;
+    customer_name?: string;
+    customer_email?: string;
     total_amount?: number;
     status?: string;
+    payment_method?: string;
+    items_count?: number;
     created_at?: string;
     updated_at?: string;
     [key: string]: unknown;
