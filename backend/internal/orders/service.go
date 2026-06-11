@@ -33,12 +33,17 @@ type CreateOrderInput struct {
 
 // CreateOrderOutput represents the output after creating an order
 type CreateOrderOutput struct {
-	ID          int64
-	UserID      int64
-	TotalAmount float64
-	Status      string
-	CreatedAt   string
-	UpdatedAt   string
+	ID            int64
+	OrderNumber   string
+	UserID        int64
+	CustomerName  string
+	CustomerEmail string
+	TotalAmount   float64
+	Status        string
+	PaymentMethod string
+	ItemsCount    int64
+	CreatedAt     string
+	UpdatedAt     string
 }
 
 // CreateOrder creates a new order with validation
@@ -62,21 +67,25 @@ func (s *Service) CreateOrder(ctx context.Context, input *CreateOrderInput) (*Cr
 		return nil, fmt.Errorf("failed to create order: %w", err)
 	}
 
-	totalAmountValue, err := numericToFloat64(order.TotalAmount)
-	if err != nil {
-		s.logger.Errorf("failed to parse order total amount: %v", err)
-		return nil, fmt.Errorf("failed to parse order total amount: %w", err)
-	}
-
 	s.logger.Infof("order created successfully with ID: %d", order.ID)
 
+	orderData, err := s.buildOrderData(ctx, order)
+	if err != nil {
+		return nil, err
+	}
+
 	return &CreateOrderOutput{
-		ID:          int64(order.ID),
-		UserID:      int64(order.UserID),
-		TotalAmount: totalAmountValue,
-		Status:      order.Status,
-		CreatedAt:   order.CreatedAt.String(),
-		UpdatedAt:   order.UpdatedAt.String(),
+		ID:            orderData.ID,
+		OrderNumber:   orderData.OrderNumber,
+		UserID:        orderData.UserID,
+		CustomerName:  orderData.CustomerName,
+		CustomerEmail: orderData.CustomerEmail,
+		TotalAmount:   orderData.TotalAmount,
+		Status:        orderData.Status,
+		PaymentMethod: orderData.PaymentMethod,
+		ItemsCount:    orderData.ItemsCount,
+		CreatedAt:     orderData.CreatedAt,
+		UpdatedAt:     orderData.UpdatedAt,
 	}, nil
 }
 
@@ -87,12 +96,17 @@ type GetOrderByIDInput struct {
 
 // GetOrderByIDOutput represents the output
 type GetOrderByIDOutput struct {
-	ID          int64
-	UserID      int64
-	TotalAmount float64
-	Status      string
-	CreatedAt   string
-	UpdatedAt   string
+	ID            int64
+	OrderNumber   string
+	UserID        int64
+	CustomerName  string
+	CustomerEmail string
+	TotalAmount   float64
+	Status        string
+	PaymentMethod string
+	ItemsCount    int64
+	CreatedAt     string
+	UpdatedAt     string
 }
 
 // GetOrderByID retrieves an order by its ID
@@ -109,19 +123,23 @@ func (s *Service) GetOrderByID(ctx context.Context, input *GetOrderByIDInput) (*
 		return nil, fmt.Errorf("failed to fetch order: %w", err)
 	}
 
-	totalAmountValue, err := numericToFloat64(order.TotalAmount)
+	orderData, err := s.buildOrderData(ctx, order)
 	if err != nil {
-		s.logger.Errorf("failed to parse order total amount: %v", err)
-		return nil, fmt.Errorf("failed to parse order total amount: %w", err)
+		return nil, err
 	}
 
 	return &GetOrderByIDOutput{
-		ID:          int64(order.ID),
-		UserID:      int64(order.UserID),
-		TotalAmount: totalAmountValue,
-		Status:      order.Status,
-		CreatedAt:   order.CreatedAt.String(),
-		UpdatedAt:   order.UpdatedAt.String(),
+		ID:            orderData.ID,
+		OrderNumber:   orderData.OrderNumber,
+		UserID:        orderData.UserID,
+		CustomerName:  orderData.CustomerName,
+		CustomerEmail: orderData.CustomerEmail,
+		TotalAmount:   orderData.TotalAmount,
+		Status:        orderData.Status,
+		PaymentMethod: orderData.PaymentMethod,
+		ItemsCount:    orderData.ItemsCount,
+		CreatedAt:     orderData.CreatedAt,
+		UpdatedAt:     orderData.UpdatedAt,
 	}, nil
 }
 
@@ -140,12 +158,17 @@ type ListOrdersOutput struct {
 }
 
 type OrderData struct {
-	ID          int64
-	UserID      int64
-	TotalAmount float64
-	Status      string
-	CreatedAt   string
-	UpdatedAt   string
+	ID            int64
+	OrderNumber   string
+	UserID        int64
+	CustomerName  string
+	CustomerEmail string
+	TotalAmount   float64
+	Status        string
+	PaymentMethod string
+	ItemsCount    int64
+	CreatedAt     string
+	UpdatedAt     string
 }
 
 // ListOrdersByUserID retrieves orders by user ID
@@ -175,18 +198,11 @@ func (s *Service) ListOrdersByUserID(ctx context.Context, input *ListOrdersByUse
 	}
 
 	for i, order := range orders {
-		totalAmountValue, err := numericToFloat64(order.TotalAmount)
+		orderData, err := s.buildOrderData(ctx, order)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse order total amount: %w", err)
+			return nil, err
 		}
-		output.Orders[i] = OrderData{
-			ID:          int64(order.ID),
-			UserID:      int64(order.UserID),
-			TotalAmount: totalAmountValue,
-			Status:      order.Status,
-			CreatedAt:   order.CreatedAt.String(),
-			UpdatedAt:   order.UpdatedAt.String(),
-		}
+		output.Orders[i] = orderData
 	}
 
 	s.logger.Infof("fetched %d orders for user: %d", len(orders), input.UserID)
@@ -228,18 +244,11 @@ func (s *Service) ListOrdersByStatus(ctx context.Context, input *ListOrdersBySta
 	}
 
 	for i, order := range orders {
-		totalAmountValue, err := numericToFloat64(order.TotalAmount)
+		orderData, err := s.buildOrderData(ctx, order)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse order total amount: %w", err)
+			return nil, err
 		}
-		output.Orders[i] = OrderData{
-			ID:          int64(order.ID),
-			UserID:      int64(order.UserID),
-			TotalAmount: totalAmountValue,
-			Status:      order.Status,
-			CreatedAt:   order.CreatedAt.String(),
-			UpdatedAt:   order.UpdatedAt.String(),
-		}
+		output.Orders[i] = orderData
 	}
 
 	s.logger.Infof("fetched %d orders with status: %s", len(orders), input.Status)
@@ -251,6 +260,62 @@ func (s *Service) ListOrdersByStatus(ctx context.Context, input *ListOrdersBySta
 type ListAllOrdersInput struct {
 	Limit  int32
 	Offset int32
+}
+
+// UpdateOrderStatusInput represents the input for updating an order status
+type UpdateOrderStatusInput struct {
+	OrderID int64
+	Status  string
+}
+
+// UpdateOrderStatusOutput represents the output after updating order status
+type UpdateOrderStatusOutput struct {
+	ID            int64
+	OrderNumber   string
+	UserID        int64
+	CustomerName  string
+	CustomerEmail string
+	TotalAmount   float64
+	Status        string
+	PaymentMethod string
+	ItemsCount    int64
+	CreatedAt     string
+	UpdatedAt     string
+}
+
+// UpdateOrderStatus updates the status of an order
+func (s *Service) UpdateOrderStatus(ctx context.Context, input *UpdateOrderStatusInput) (*UpdateOrderStatusOutput, error) {
+	if input.OrderID == 0 {
+		return nil, fmt.Errorf("order ID is required")
+	}
+	if input.Status == "" {
+		return nil, fmt.Errorf("status is required")
+	}
+
+	order, err := s.queries.UpdateOrderStatus(ctx, int32(input.OrderID), input.Status)
+	if err != nil {
+		s.logger.Errorf("failed to update order status: %v", err)
+		return nil, fmt.Errorf("failed to update order status: %w", err)
+	}
+
+	orderData, err := s.buildOrderData(ctx, order)
+	if err != nil {
+		return nil, err
+	}
+
+	return &UpdateOrderStatusOutput{
+		ID:            orderData.ID,
+		OrderNumber:   orderData.OrderNumber,
+		UserID:        orderData.UserID,
+		CustomerName:  orderData.CustomerName,
+		CustomerEmail: orderData.CustomerEmail,
+		TotalAmount:   orderData.TotalAmount,
+		Status:        orderData.Status,
+		PaymentMethod: orderData.PaymentMethod,
+		ItemsCount:    orderData.ItemsCount,
+		CreatedAt:     orderData.CreatedAt,
+		UpdatedAt:     orderData.UpdatedAt,
+	}, nil
 }
 
 // ListAllOrders retrieves all orders with pagination
@@ -277,23 +342,70 @@ func (s *Service) ListAllOrders(ctx context.Context, input *ListAllOrdersInput) 
 	}
 
 	for i, order := range orders {
-		totalAmountValue, err := numericToFloat64(order.TotalAmount)
+		orderData, err := s.buildOrderData(ctx, order)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse order total amount: %w", err)
+			return nil, err
 		}
-		output.Orders[i] = OrderData{
-			ID:          int64(order.ID),
-			UserID:      int64(order.UserID),
-			TotalAmount: totalAmountValue,
-			Status:      order.Status,
-			CreatedAt:   order.CreatedAt.String(),
-			UpdatedAt:   order.UpdatedAt.String(),
-		}
+		output.Orders[i] = orderData
 	}
 
 	s.logger.Infof("fetched %d orders", len(orders))
 
 	return output, nil
+}
+
+func (s *Service) buildOrderData(ctx context.Context, order queries.Order) (OrderData, error) {
+	totalAmountValue, err := numericToFloat64(order.TotalAmount)
+	if err != nil {
+		s.logger.Errorf("failed to parse order total amount: %v", err)
+		return OrderData{}, fmt.Errorf("failed to parse order total amount: %w", err)
+	}
+
+	orderNumber := buildOrderNumber(int64(order.ID))
+	customerName := "Guest"
+	customerEmail := ""
+	if order.UserID != 0 {
+		user, err := s.queries.GetUserByID(ctx, order.UserID)
+		if err == nil {
+			if user.Name != "" {
+				customerName = user.Name
+			} else if user.Email != "" {
+				customerName = user.Email
+			}
+			customerEmail = user.Email
+		} else {
+			s.logger.Debugf("could not load customer info for user %d: %v", order.UserID, err)
+		}
+	}
+
+	itemsCount, err := s.queries.CountOrderItems(ctx, order.ID)
+	if err != nil {
+		s.logger.Debugf("could not count order items for order %d: %v", order.ID, err)
+		itemsCount = 0
+	}
+
+	paymentMethod := "card"
+	if order.Status == "pending" {
+		paymentMethod = "card"
+	}
+
+	return OrderData{
+		ID:            int64(order.ID),
+		OrderNumber:   orderNumber,
+		UserID:        int64(order.UserID),
+		CustomerName:  customerName,
+		CustomerEmail: customerEmail,
+		TotalAmount:   totalAmountValue,
+		Status:        order.Status,
+		PaymentMethod: paymentMethod,
+		ItemsCount:    itemsCount,
+		CreatedAt:     order.CreatedAt.String(),
+		UpdatedAt:     order.UpdatedAt.String(),
+	}, nil
+}
+
+func buildOrderNumber(orderID int64) string {
+	return fmt.Sprintf("ORD-%06d", orderID)
 }
 
 func numericToFloat64(value pgtype.Numeric) (float64, error) {

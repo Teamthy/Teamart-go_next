@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import SellerAppShell from "@/components/seller/SellerAppShell";
 import PageHeader from "@/components/seller/PageHeader";
 import SellerButton from "@/components/seller/Button";
 import DataTable from "@/components/seller/DataTable";
 import Badge from "@/components/seller/Badge";
 import { Download, Printer, Search } from "lucide-react";
+import * as api from "@/lib/api";
 
 interface Order {
     id: string;
@@ -27,79 +28,6 @@ interface Order {
     paymentMethod: string;
 }
 
-const mockOrders: Order[] = [
-    {
-        id: "1",
-        orderNumber: "ORD-001",
-        customer: "John Doe",
-        amount: 299.99,
-        items: 2,
-        status: "delivered",
-        date: "2024-01-15",
-        paymentMethod: "Credit Card",
-    },
-    {
-        id: "2",
-        orderNumber: "ORD-002",
-        customer: "Jane Smith",
-        amount: 149.99,
-        items: 1,
-        status: "shipped",
-        date: "2024-01-14",
-        paymentMethod: "PayPal",
-    },
-    {
-        id: "3",
-        orderNumber: "ORD-003",
-        customer: "Bob Johnson",
-        amount: 499.99,
-        items: 3,
-        status: "processing",
-        date: "2024-01-13",
-        paymentMethod: "Credit Card",
-    },
-    {
-        id: "4",
-        orderNumber: "ORD-004",
-        customer: "Alice Williams",
-        amount: 89.99,
-        items: 1,
-        status: "paid",
-        date: "2024-01-12",
-        paymentMethod: "Debit Card",
-    },
-    {
-        id: "5",
-        orderNumber: "ORD-005",
-        customer: "Charlie Brown",
-        amount: 599.99,
-        items: 4,
-        status: "pending",
-        date: "2024-01-11",
-        paymentMethod: "Credit Card",
-    },
-    {
-        id: "6",
-        orderNumber: "ORD-006",
-        customer: "Diana Prince",
-        amount: 349.99,
-        items: 2,
-        status: "delivered",
-        date: "2024-01-10",
-        paymentMethod: "Apple Pay",
-    },
-    {
-        id: "7",
-        orderNumber: "ORD-007",
-        customer: "Evan Davis",
-        amount: 179.99,
-        items: 1,
-        status: "refunded",
-        date: "2024-01-09",
-        paymentMethod: "Credit Card",
-    },
-];
-
 const statusConfig = {
     pending: { variant: "warning", label: "Pending" },
     paid: { variant: "secondary", label: "Paid" },
@@ -117,13 +45,42 @@ export default function OrdersPage() {
     const [selectedIds, setSelectedIds] = useState<(string | number)[]>([]);
     const [sortColumn, setSortColumn] = useState<string>("");
     const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+    const [orders, setOrders] = useState<Order[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-    const handleSort = (column: string, direction: "asc" | "desc") => {
-        setSortColumn(column);
-        setSortDirection(direction);
-    };
+    useEffect(() => {
+        setIsLoading(true);
+        setError(null);
 
-    const filteredOrders = mockOrders.filter((order) => {
+        api.listOrders(100, 0)
+            .then((response: any) => {
+                const loadedOrders = Array.isArray(response?.orders)
+                    ? response.orders
+                    : Array.isArray(response)
+                        ? response
+                        : [];
+
+                setOrders(
+                    loadedOrders.map((order: any) => ({
+                        id: String(order.id || order.order_number || order.orderId || ""),
+                        orderNumber: order.order_number || order.orderNumber || order.orderId || String(order.id || ""),
+                        customer: order.customer_name || order.customer || "Guest",
+                        amount: Number(order.total_amount ?? order.totalAmount ?? order.amount ?? 0),
+                        items: Number(order.items_count ?? order.items ?? order.quantity ?? 0),
+                        status: (order.status || "pending") as Order["status"],
+                        date: order.created_at || order.createdAt || "",
+                        paymentMethod: order.payment_method || order.paymentMethod || "Unknown",
+                    }))
+                );
+            })
+            .catch((error: any) => {
+                setError(error?.message || "Failed to load orders.");
+            })
+            .finally(() => setIsLoading(false));
+    }, []);
+
+    const filteredOrders = orders.filter((order) => {
         const matchesSearch =
             order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
             order.customer.toLowerCase().includes(searchQuery.toLowerCase());

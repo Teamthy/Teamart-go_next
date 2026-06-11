@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import StatCard from "@/components/ui/StatCard";
@@ -8,6 +9,7 @@ import Button from "@/components/ui/button";
 import RouteGuard from "@/components/auth/RouteGuard";
 import { getStoredCustomer } from "@/lib/auth-state";
 import { products } from "@/lib/mock/products";
+import * as api from "@/lib/api";
 
 const accountSections = [
     {
@@ -37,15 +39,61 @@ const accountSections = [
     },
 ];
 
+interface OrderSummary {
+    id: string;
+    order_number?: string;
+    status?: string;
+    total_amount?: number;
+    created_at?: string;
+}
+
 export default function AccountSectionPage({ params }: { params: { section?: string } }) {
     const customer = getStoredCustomer();
     const section = accountSections.find((item) => item.slug === params.section)?.slug ?? "profile";
 
+    const [orders, setOrders] = useState<OrderSummary[]>([]);
+    const [ordersLoading, setOrdersLoading] = useState(false);
+    const [ordersError, setOrdersError] = useState<string | null>(null);
+
     const sharedStats = [
         { label: "Saved items", value: "8", helper: "A quick summary of wishlist and saved checkout moments." },
-        { label: "Orders", value: "3", helper: "Recent orders are ready for review and reorder." },
+        { label: "Orders", value: orders.length.toString(), helper: "Recent orders are ready for review and reorder." },
         { label: "Verified", value: customer?.verified ? "Yes" : "No", helper: "Verification is reflected from your onboarding step." },
     ];
+
+    useEffect(() => {
+        if (section !== "orders" || !customer?.id) {
+            return;
+        }
+
+        setOrdersLoading(true);
+        setOrdersError(null);
+
+        api.listUserOrders(customer.id, 20, 0)
+            .then((response: any) => {
+                const loadedOrders = Array.isArray(response?.orders)
+                    ? response.orders
+                    : Array.isArray(response)
+                        ? response
+                        : [];
+
+                setOrders(
+                    loadedOrders.map((order: any) => ({
+                        id: String(order.id || order.order_number || order.orderId || ""),
+                        order_number: order.order_number || order.orderNumber || order.order_id || String(order.id || ""),
+                        status: order.status || "pending",
+                        total_amount: Number(order.total_amount ?? order.totalAmount ?? order.amount ?? 0),
+                        created_at: order.created_at || order.createdAt || "",
+                    }))
+                );
+            })
+            .catch((error: any) => {
+                setOrdersError(error?.message || "Failed to load orders.");
+            })
+            .finally(() => {
+                setOrdersLoading(false);
+            });
+    }, [section, customer?.id]);
 
     return (
         <RouteGuard>
@@ -83,20 +131,26 @@ export default function AccountSectionPage({ params }: { params: { section?: str
                                     <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">Recent orders</p>
                                     <h2 className="mt-3 text-xl font-semibold text-zinc-900">Order activity</h2>
                                 </div>
-                                {[
-                                    { id: "#TA-1021", status: "Delivered", total: "$48" },
-                                    { id: "#TA-1024", status: "Processing", total: "$72" },
-                                ].map((order) => (
-                                    <div key={order.id} className="rounded-[24px] border border-zinc-200 p-4">
-                                        <div className="flex items-center justify-between gap-4">
-                                            <div>
-                                                <p className="font-semibold text-zinc-900">{order.id}</p>
-                                                <p className="text-sm text-zinc-500">{order.status}</p>
+                                {ordersLoading ? (
+                                    <div className="rounded-[24px] border border-zinc-200 p-6 text-sm text-zinc-500">Loading orders...</div>
+                                ) : ordersError ? (
+                                    <div className="rounded-[24px] border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">{ordersError}</div>
+                                ) : orders.length === 0 ? (
+                                    <div className="rounded-[24px] border border-zinc-200 p-6 text-sm text-zinc-500">No recent orders found.</div>
+                                ) : (
+                                    orders.map((order) => (
+                                        <div key={order.id} className="rounded-[24px] border border-zinc-200 p-4">
+                                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                                <div>
+                                                    <p className="font-semibold text-zinc-900">{order.order_number || order.id}</p>
+                                                    <p className="text-sm text-zinc-500">{order.status}</p>
+                                                </div>
+                                                <p className="text-sm font-semibold text-zinc-900">{order.total_amount ? `$${order.total_amount.toFixed(2)}` : "—"}</p>
                                             </div>
-                                            <p className="text-sm font-semibold text-zinc-900">{order.total}</p>
+                                            <p className="mt-2 text-sm text-zinc-500">Placed {order.created_at ? new Date(order.created_at).toLocaleDateString() : "—"}</p>
                                         </div>
-                                    </div>
-                                ))}
+                                    ))
+                                )}
                             </div>
                         ) : section === "wishlist" ? (
                             <div className="space-y-4">

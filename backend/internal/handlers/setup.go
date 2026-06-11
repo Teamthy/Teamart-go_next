@@ -13,6 +13,12 @@ import (
 	"github.com/teamart/commerce-api/internal/merchant"
 	"github.com/teamart/commerce-api/internal/middleware"
 	"github.com/teamart/commerce-api/internal/moderation"
+	"github.com/teamart/commerce-api/internal/checkout"
+	"github.com/teamart/commerce-api/internal/payments"
+	"github.com/teamart/commerce-api/internal/fulfillment"
+	"github.com/teamart/commerce-api/internal/returns"
+	"github.com/teamart/commerce-api/internal/shipping"
+	"github.com/teamart/commerce-api/internal/support"
 	"github.com/teamart/commerce-api/internal/orders"
 	"github.com/teamart/commerce-api/internal/products"
 	rec "github.com/teamart/commerce-api/internal/recommendation"
@@ -64,6 +70,18 @@ func SetupHandlers(
 	productService := products.NewService(q, log)
 	orderService := orders.NewService(q, log)
 
+	// Shipping service
+	shippingService := shipping.NewService(q, log)
+
+	// Fulfillment, Returns, Support services
+	fulfillmentService := fulfillment.NewService(q, log)
+	returnsService := returns.NewService(q, log)
+	supportService := support.NewService(q, log)
+
+	// Checkout and Payments services
+	checkoutService := checkout.NewCheckoutService(q, log)
+	paymentService := payments.NewPaymentService(q, log)
+
 	merchantRepo := merchant.NewPostgresRepository(db, log)
 	merchantService := merchant.NewService(merchantRepo, log)
 	staffService := staff.NewService(db, log)
@@ -73,6 +91,12 @@ func SetupHandlers(
 	userHandler := NewUserHandler(userService, log)
 	productHandler := NewProductHandler(productService, log)
 	orderHandler := NewOrderHandler(orderService, log)
+	shippingHandler := NewShippingHandler(shippingService, log)
+	fulfillmentHandler := NewFulfillmentHandler(fulfillmentService, log)
+	returnsHandler := NewReturnsHandler(returnsService, log)
+	supportHandler := NewSupportHandler(supportService, log)
+	checkoutHandler := NewCheckoutHandler(checkoutService, log)
+	paymentHandler := NewPaymentHandler(paymentService, log)
 	merchantHandler := NewMerchantHandler(merchantService, staffService, tenantService, log)
 	tenantHandler := NewTenantHandler(merchantService, staffService, tenantService, log)
 	storeHandler := NewStoreHandler(log)
@@ -81,6 +105,12 @@ func SetupHandlers(
 	RegisterUserRoutes(mux, userHandler)
 	RegisterProductRoutes(mux, productHandler)
 	RegisterOrderRoutes(mux, orderHandler)
+	RegisterShippingRoutes(mux, shippingHandler)
+	RegisterFulfillmentRoutes(mux, fulfillmentHandler)
+	RegisterReturnsRoutes(mux, returnsHandler)
+	RegisterSupportRoutes(mux, supportHandler)
+	RegisterCheckoutRoutes(mux, checkoutHandler)
+	RegisterPaymentRoutes(mux, paymentHandler)
 	RegisterStoreRoutes(mux, storeHandler)
 	RegisterMerchantRoutes(mux, merchantHandler)
 	RegisterTenantRoutes(mux, tenantHandler)
